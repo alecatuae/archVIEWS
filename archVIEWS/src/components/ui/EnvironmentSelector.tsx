@@ -39,15 +39,21 @@ const EnvironmentSelector: React.FC = () => {
     }
     
     // Atualizar a URL com o ambiente selecionado
-    const query = { ...router.query, env: value.id };
-    if (value.id === 'all') {
-      delete query.env;
-    }
+    const query = { ...router.query };
     
-    router.push({
-      pathname: router.pathname,
-      query
-    }, undefined, { shallow: true });
+    if (value.id === 'all') {
+      // Criar um novo objeto sem a propriedade env
+      const { env, ...newQuery } = query;
+      router.push({
+        pathname: router.pathname,
+        query: newQuery
+      }, undefined, { shallow: true });
+    } else {
+      router.push({
+        pathname: router.pathname,
+        query: { ...query, env: value.id }
+      }, undefined, { shallow: true });
+    }
   };
 
   return (
