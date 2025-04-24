@@ -11,9 +11,12 @@ archVIEWS é uma aplicação para visualização e gerenciamento de arquitetura 
 
 ### Opção 1: Execução Rápida (com Docker)
 
-Simplesmente execute o script de bootstrap:
+Clone o repositório e execute o script de bootstrap:
 
 ```bash
+git clone <URL-DO-REPOSITORIO>
+cd archVIEWS
+chmod +x BOOTSTRAP.sh  # Se necessário
 ./BOOTSTRAP.sh
 ```
 
@@ -49,31 +52,46 @@ O sistema utiliza duas bases de dados:
 1. **Neo4j**: Armazena os componentes de infraestrutura e suas relações em formato de grafo
 2. **MariaDB**: Armazena informações sobre usuários, equipes, e registros de conformidade
 
-## Desenvolvimento Local
+## Estrutura do Projeto
 
-Para desenvolvimento local (sem Docker):
+```
+archVIEWS/
+├── docker-compose.yml    # Configuração dos containers Docker
+├── Dockerfile            # Configuração para build da aplicação
+├── BOOTSTRAP.sh          # Script de inicialização automática
+├── archVIEWS/            # Código fonte da aplicação
+│   ├── src/              # Código principal
+│   ├── prisma/           # Esquema e migrações do banco de dados
+│   └── package.json      # Dependências
+```
 
-1. Instale as dependências:
+## Solução de Problemas
+
+### Porta 3306 já em uso
+
+Se a porta 3306 já estiver em uso por outro serviço (como MySQL ou MariaDB local), você pode:
+
+1. Parar o serviço local:
    ```bash
-   npm install
+   sudo service mysql stop   # Linux
+   sudo brew services stop mysql  # macOS com Homebrew
    ```
 
-2. Configure as variáveis de ambiente (crie um arquivo .env.local)
-
-3. Execute as migrações do Prisma:
-   ```bash
-   npx prisma migrate dev
+2. Ou modificar a porta no arquivo docker-compose.yml:
+   ```yaml
+   mariadb:
+     ports:
+       - "3307:3306"  # Use 3307 localmente
    ```
 
-4. Execute o seed de dados:
-   ```bash
-   npx prisma db seed
-   ```
+### Outros problemas
 
-5. Inicie a aplicação:
-   ```bash
-   npm run dev
-   ```
+Verifique os logs dos containers:
+```bash
+docker logs archview-app
+docker logs archview-mariadb
+docker logs archview-neo4j
+```
 
 ## Acessos
 

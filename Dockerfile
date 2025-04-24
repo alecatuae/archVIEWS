@@ -18,5 +18,5 @@ RUN npm run build || echo "Build failed, but continuing for development mode"
 # Expose port 3000 (will be mapped to 8081)
 EXPOSE 3000
 
-# Start the application
-CMD ["npm", "start"] 
+# Start the application in development mode
+CMD ["npm", "run", "dev"] 
