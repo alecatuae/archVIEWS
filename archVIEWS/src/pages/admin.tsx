@@ -192,6 +192,58 @@ export default function Admin() {
     );
   };
 
+  const renderGraphNodesTab = () => {
+    return (
+      <div className="p-6">
+        <div className="text-center mb-6">
+          <p className="text-neutral-gray mb-4">Gerenciamento de nós do grafo Neo4j.</p>
+          <Link href="/admin/graph-nodes">
+            <Button>
+              Acessar Gerenciamento de Nós
+            </Button>
+          </Link>
+        </div>
+        
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="text-blue-800 font-medium mb-2">O que você pode fazer:</h3>
+          <ul className="list-disc pl-5 text-blue-700 space-y-1">
+            <li>Visualizar todos os nós do grafo Neo4j</li>
+            <li>Adicionar novos nós com propriedades personalizadas</li>
+            <li>Editar propriedades de nós existentes</li>
+            <li>Excluir nós (e suas relações)</li>
+            <li>Filtrar nós por ambiente</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
+  const renderGraphEdgesTab = () => {
+    return (
+      <div className="p-6">
+        <div className="text-center mb-6">
+          <p className="text-neutral-gray mb-4">Gerenciamento de relacionamentos do grafo Neo4j.</p>
+          <Link href="/admin/graph-edges">
+            <Button>
+              Acessar Gerenciamento de Relacionamentos
+            </Button>
+          </Link>
+        </div>
+        
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <h3 className="text-green-800 font-medium mb-2">O que você pode fazer:</h3>
+          <ul className="list-disc pl-5 text-green-700 space-y-1">
+            <li>Visualizar todos os relacionamentos entre nós</li>
+            <li>Criar novos relacionamentos entre nós existentes</li>
+            <li>Editar propriedades de relacionamentos</li>
+            <li>Excluir relacionamentos</li>
+            <li>Filtrar relacionamentos por tipo</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
   const renderTeamsTab = () => {
     return (
       <div className="p-6 text-center">
@@ -217,13 +269,13 @@ export default function Admin() {
       </Head>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-neutral-gray">Administração</h1>
-        <p className="text-neutral-gray">Gerencie componentes, times e usuários.</p>
+        <p className="text-neutral-gray">Gerencie componentes, dados do grafo, times e usuários.</p>
       </div>
 
       <div className="mb-4 border-b border-neutral-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto">
           <button
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
               activeTab === 'components'
                 ? 'border-computing-purple text-computing-purple'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
@@ -233,7 +285,27 @@ export default function Admin() {
             Componentes
           </button>
           <button
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+              activeTab === 'graph-nodes'
+                ? 'border-computing-purple text-computing-purple'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+            onClick={() => setActiveTab('graph-nodes')}
+          >
+            Nós do Grafo
+          </button>
+          <button
+            className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+              activeTab === 'graph-edges'
+                ? 'border-computing-purple text-computing-purple'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+            onClick={() => setActiveTab('graph-edges')}
+          >
+            Relacionamentos
+          </button>
+          <button
+            className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
               activeTab === 'teams'
                 ? 'border-computing-purple text-computing-purple'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
@@ -243,7 +315,7 @@ export default function Admin() {
             Times
           </button>
           <button
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
               activeTab === 'users'
                 ? 'border-computing-purple text-computing-purple'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
@@ -257,6 +329,8 @@ export default function Admin() {
 
       <Card>
         {activeTab === 'components' && renderComponentsTab()}
+        {activeTab === 'graph-nodes' && renderGraphNodesTab()}
+        {activeTab === 'graph-edges' && renderGraphEdgesTab()}
         {activeTab === 'teams' && renderTeamsTab()}
         {activeTab === 'users' && renderUsersTab()}
       </Card>
