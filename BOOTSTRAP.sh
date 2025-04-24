@@ -50,13 +50,16 @@ check_node() {
   fi
 }
 
-# Criar docker-compose.yml
+# Criar docker-compose.yml se não existir
 create_docker_compose() {
+  if [ -f "docker-compose.yml" ]; then
+    print_message "Arquivo docker-compose.yml já existe. Usando o existente."
+    return
+  fi
+  
   print_message "Criando arquivo docker-compose.yml..."
   
   cat > docker-compose.yml << 'EOL'
-version: '3.8'
-
 services:
   # Neo4j Database
   neo4j:
@@ -106,6 +109,26 @@ services:
     depends_on:
       - mariadb
 
+  # Application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: archview-app
+    ports:
+      - "8081:3000"
+    environment:
+      - NEO4J_URI=neo4j://neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=password
+      - NEO4J_DATABASE=neo4j
+      - DATABASE_URL=mysql://archview_user:password@mariadb:3306/archview
+    depends_on:
+      - neo4j
+      - mariadb
+    networks:
+      - archview-network
+
 networks:
   archview-network:
     driver: bridge
@@ -119,6 +142,40 @@ volumes:
 EOL
 
   print_message "Arquivo docker-compose.yml criado com sucesso."
+}
+
+# Criar Dockerfile se não existir
+create_dockerfile() {
+  if [ -f "Dockerfile" ]; then
+    print_message "Arquivo Dockerfile já existe. Usando o existente."
+    return
+  fi
+  
+  print_message "Criando arquivo Dockerfile..."
+  
+  cat > Dockerfile << 'EOL'
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy application files
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Expose port 3000 (will be mapped to 8081)
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"]
+EOL
+
+  print_message "Arquivo Dockerfile criado com sucesso."
 }
 
 # Iniciar os containers
@@ -150,8 +207,14 @@ install_dependencies() {
   npm install
   
   if [ $? -ne 0 ]; then
-    print_error "Falha ao instalar dependências. Verifique se o npm está funcionando corretamente."
-    exit 1
+    print_error "Falha ao instalar dependências. Verificando se a aplicação está em container Docker..."
+    if docker ps | grep "archview-app" > /dev/null; then
+      print_message "A aplicação está rodando em um container Docker. Pulando instalação local de dependências."
+      return 0
+    else
+      print_error "Falha ao instalar dependências. Verifique se o npm está funcionando corretamente."
+      exit 1
+    fi
   fi
   
   print_message "Dependências instaladas com sucesso."
@@ -167,6 +230,7 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=password
 NEO4J_DATABASE=neo4j
 DATABASE_URL="mysql://archview_user:password@localhost:3306/archview"
+PORT=8081
 EOL
 
   print_message "Arquivo .env.local criado com sucesso."
@@ -178,8 +242,14 @@ run_prisma_migrations() {
   npx prisma migrate dev --name init
   
   if [ $? -ne 0 ]; then
-    print_error "Falha ao executar migrações do Prisma."
-    exit 1
+    print_error "Falha ao executar migrações do Prisma. Verificando se a aplicação está em container Docker..."
+    if docker ps | grep "archview-app" > /dev/null; then
+      print_message "A aplicação está rodando em um container Docker. Pulando migrações locais."
+      return 0
+    else
+      print_error "Falha ao executar migrações do Prisma."
+      exit 1
+    fi
   fi
   
   print_message "Migrações do Prisma executadas com sucesso."
@@ -300,24 +370,72 @@ EOL
   npx ts-node prisma/seed.ts
   
   if [ $? -ne 0 ]; then
-    print_warning "Falha ao executar seed de dados, mas continuando..."
+    print_warning "Falha ao executar seed de dados localmente, mas continuando... Os dados serão criados no container Docker."
   else
     print_message "Seed de dados executado com sucesso."
   fi
 }
 
+# Verificar se a aplicação está rodando
+check_app_running() {
+  print_message "Verificando se a aplicação está rodando..."
+  
+  local max_attempts=15
+  local attempt=1
+  local app_url="http://localhost:8081"
+  
+  while [ $attempt -le $max_attempts ]; do
+    print_message "Tentativa $attempt de $max_attempts: Verificando $app_url"
+    
+    # Usar curl para verificar se a aplicação responde
+    if curl -s --head --request GET $app_url | grep "200 OK" > /dev/null; then
+      print_message "Aplicação está rodando em $app_url"
+      return 0
+    fi
+    
+    attempt=$((attempt+1))
+    sleep 2
+  done
+  
+  print_warning "Não foi possível confirmar se a aplicação está rodando após $max_attempts tentativas."
+  print_message "Verifique manualmente em $app_url"
+}
+
 # Iniciar a aplicação Next.js
 start_nextjs() {
-  print_message "Iniciando a aplicação Next.js..."
-  npm run dev &
+  if docker ps | grep "archview-app" > /dev/null; then
+    print_message "Aplicação já está rodando em um container Docker."
+    print_message "Acesse http://localhost:8081 para utilizar a aplicação"
+    return 0
+  fi
+  
+  print_message "Iniciando a aplicação Next.js na porta 8081..."
+  PORT=8081 npm run dev &
   
   print_message "Aguardando a aplicação iniciar..."
   sleep 5
   
   print_message "archView está rodando!"
-  print_message "Acesse http://localhost:3000 para utilizar a aplicação"
+  print_message "Acesse http://localhost:8081 para utilizar a aplicação"
   print_message "Neo4j Browser: http://localhost:7474 (usuário: neo4j, senha: password)"
   print_message "Adminer (gerenciador de banco de dados): http://localhost:8080 (sistema: MySQL, servidor: mariadb, usuário: archview_user, senha: password, banco: archview)"
+}
+
+# Exibir resumo de acesso
+show_access_summary() {
+  echo ""
+  print_message "==== Resumo de Acesso ===="
+  print_message "Aplicação: http://localhost:8081"
+  print_message "Neo4j Browser: http://localhost:7474"
+  print_message "  - Usuário: neo4j"
+  print_message "  - Senha: password"
+  print_message "Adminer (gerenciador de banco de dados): http://localhost:8080"
+  print_message "  - Sistema: MySQL"
+  print_message "  - Servidor: mariadb (ou localhost se não estiver usando Docker)"
+  print_message "  - Usuário: archview_user"
+  print_message "  - Senha: password"
+  print_message "  - Banco: archview"
+  echo ""
 }
 
 # Função principal
@@ -328,26 +446,38 @@ main() {
   check_docker
   check_node
   
-  # Criar Docker Compose
+  # Criar Docker Compose e Dockerfile
   create_docker_compose
+  create_dockerfile
   
   # Iniciar containers
   start_containers
   
-  # Instalar dependências
-  install_dependencies
+  # Se a aplicação não estiver em um container, configurá-la localmente
+  if ! docker ps | grep "archview-app" > /dev/null; then
+    # Instalar dependências
+    install_dependencies
+    
+    # Criar arquivo de ambiente
+    create_env_file
+    
+    # Executar migrações do Prisma
+    run_prisma_migrations
+    
+    # Executar seed de dados
+    run_seed
+    
+    # Iniciar Next.js
+    start_nextjs
+  else
+    print_message "Aplicação está rodando em um container Docker."
+  fi
   
-  # Criar arquivo de ambiente
-  create_env_file
+  # Verificar se a aplicação está rodando
+  check_app_running
   
-  # Executar migrações do Prisma
-  run_prisma_migrations
-  
-  # Executar seed de dados
-  run_seed
-  
-  # Iniciar Next.js
-  start_nextjs
+  # Exibir resumo de acesso
+  show_access_summary
   
   print_message "==== Configuração do archView concluída! ===="
 }

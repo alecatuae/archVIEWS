@@ -49,6 +49,26 @@ services:
     depends_on:
       - mariadb
 
+  # Application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: archview-app
+    ports:
+      - "8081:3000"
+    environment:
+      - NEO4J_URI=neo4j://neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=password
+      - NEO4J_DATABASE=neo4j
+      - DATABASE_URL=mysql://archview_user:password@mariadb:3306/archview
+    depends_on:
+      - neo4j
+      - mariadb
+    networks:
+      - archview-network
+
 networks:
   archview-network:
     driver: bridge
