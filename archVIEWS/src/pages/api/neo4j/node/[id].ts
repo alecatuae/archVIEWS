@@ -19,7 +19,7 @@ export default async function handler(
     // Buscar detalhes do nó
     const result = await neo4jService.getNodeDetails(id);
 
-    if (!result.success) {
+    if (!result.success || !result.results) {
       return res.status(500).json({ error: result.message || 'Failed to fetch node details' });
     }
 
