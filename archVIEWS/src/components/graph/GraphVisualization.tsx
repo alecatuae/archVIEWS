@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GraphData, CytoscapeGraphData, Node, Edge } from '@/types/graph';
 import { transformToCytoscapeFormat, getCytoscapeStylesheet } from '@/utils/graphUtils';
-import { ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassPlusIcon as ZoomInIcon, 
+         MagnifyingGlassMinusIcon as ZoomOutIcon, 
+         ArrowsPointingOutIcon, 
+         ArrowPathIcon } from '@heroicons/react/24/outline';
 import GraphAlternative from './GraphAlternative';
 
 interface GraphVisualizationProps {
