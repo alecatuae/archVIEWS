@@ -44,8 +44,25 @@ export async function getGraph(limit = 100, environmentFilter = 'all') {
     LIMIT $limit
   `;
 
+  let parsedLimit = 100;
+  
+  try {
+    if (typeof limit === 'number') {
+      parsedLimit = Math.floor(limit);
+    } else if (typeof limit === 'string') {
+      parsedLimit = Math.floor(Number(limit));
+    }
+    
+    if (isNaN(parsedLimit) || parsedLimit <= 0) {
+      parsedLimit = 100;
+    }
+  } catch (error) {
+    console.error('Erro ao converter limit:', error);
+    parsedLimit = 100;
+  }
+
   const params = {
-    limit: parseInt(limit.toString()),
+    limit: parsedLimit,
     environment: environmentFilter
   };
 

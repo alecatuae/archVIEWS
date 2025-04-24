@@ -13,13 +13,31 @@ export default async function handler(
   try {
     const { limit = 100, environment = 'all' } = req.query;
 
-    // Validar parâmetros
-    const parsedLimit = parseInt(limit.toString());
-    if (isNaN(parsedLimit) || parsedLimit <= 0) {
-      return res.status(400).json({ error: 'Invalid limit parameter' });
+    // Validar parâmetros de forma mais robusta
+    let parsedLimit = 100; // valor padrão
+    
+    try {
+      if (typeof limit === 'string') {
+        // Converter string para número e arredondar para baixo
+        parsedLimit = Math.floor(Number(limit));
+        
+        // Se for NaN ou não positivo, usar o valor padrão
+        if (isNaN(parsedLimit) || parsedLimit <= 0) {
+          parsedLimit = 100;
+        }
+      } else if (typeof limit === 'number') {
+        parsedLimit = Math.floor(limit);
+        
+        if (parsedLimit <= 0) {
+          parsedLimit = 100;
+        }
+      }
+    } catch (error) {
+      console.warn('Erro ao interpretar o parâmetro limit:', error);
+      parsedLimit = 100; // Usar valor padrão em caso de erro
     }
 
-    // Buscar dados do Neo4j
+    // Buscar dados do Neo4j usando o limite validado
     const result = await neo4jService.getGraph(parsedLimit, environment.toString());
 
     if (!result.success) {
