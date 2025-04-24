@@ -1,0 +1,39 @@
+{
+  "name": "arch-view",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@headlessui/react": "^1.7.15",
+    "@heroicons/react": "^2.0.18",
+    "@prisma/client": "^4.16.1",
+    "autoprefixer": "10.4.14",
+    "axios": "^1.4.0",
+    "cytoscape": "^3.25.0",
+    "cytoscape-cola": "^2.5.1",
+    "neo4j-driver": "^5.9.2",
+    "next": "13.4.7",
+    "postcss": "8.4.24",
+    "react": "18.2.0",
+    "react-cytoscapejs": "^2.0.0",
+    "react-dom": "18.2.0",
+    "react-error-boundary": "^4.0.10",
+    "react-icons": "^4.10.1",
+    "tailwindcss": "3.3.2"
+  },
+  "devDependencies": {
+    "@types/cytoscape": "^3.19.9",
+    "@types/node": "20.3.1",
+    "@types/react": "18.2.14",
+    "@types/react-dom": "18.2.6",
+    "eslint": "8.43.0",
+    "eslint-config-next": "13.4.7",
+    "prisma": "^4.16.1",
+    "typescript": "5.1.3"
+  }
+}

@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # Neo4j Database
+  neo4j:
+    image: neo4j:4.4
+    container_name: archview-neo4j
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_dbms_memory_pagecache_size=1G
+      - NEO4J_dbms.memory.heap.initial_size=1G
+      - NEO4J_dbms_memory_heap_max__size=1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    networks:
+      - archview-network
+
+  # MariaDB Database
+  mariadb:
+    image: mariadb:10.6
+    container_name: archview-mariadb
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=archview
+      - MYSQL_USER=archview_user
+      - MYSQL_PASSWORD=password
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - archview-network
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # Adminer for database management
+  adminer:
+    image: adminer
+    container_name: archview-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - archview-network
+    depends_on:
+      - mariadb
+
+networks:
+  archview-network:
+    driver: bridge
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_import:
+  neo4j_plugins:
+  mariadb_data:
