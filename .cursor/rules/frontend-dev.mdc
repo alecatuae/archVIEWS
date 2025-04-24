@@ -50,3 +50,5 @@ Você vai colaborar comigo no desenvolvimento de uma aplicação moderna e respo
 - Use React com hooks e contextos quando necessário.
 - Prefira composição de componentes a herança.
 - Mantenha a lógica de domínio desacoplada da UI.
+
+## Lembre-se que a aplicação está sendo executada em Docker ao realizar os testes necessários. 
