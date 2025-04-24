@@ -39,6 +39,7 @@ export default function ViewGraphNode() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showRelationships, setShowRelationships] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -169,7 +170,7 @@ export default function ViewGraphNode() {
             </Button>
           </Link>
           <Button 
-            variant="danger-outline" 
+            variant="danger" 
             size="sm" 
             icon={<TrashIcon className="h-4 w-4" />}
             onClick={handleDelete}
@@ -255,7 +256,7 @@ export default function ViewGraphNode() {
                           </div>
                           <Link href={`/admin/graph-nodes/view/${otherNode.id}`}>
                             <Button 
-                              size="xs" 
+                              size="sm" 
                               variant="outline" 
                               icon={<ArrowTopRightOnSquareIcon className="h-3 w-3" />}
                             >
@@ -293,6 +294,16 @@ export default function ViewGraphNode() {
                   Ver no Grafo
                 </Button>
               </Link>
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowRelationships(prev => !prev)}
+              >
+                {showRelationships ? 'Ocultar Relacionamentos' : 'Mostrar Relacionamentos'}
+              </Button>
             </div>
           </Card>
         </div>

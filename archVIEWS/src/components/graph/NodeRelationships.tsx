@@ -36,17 +36,33 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
   useEffect(() => {
     if (nodeId) {
       fetchRelationships();
+    } else {
+      setRelationships({
+        inbound: [],
+        outbound: []
+      });
+      setIsLoading(false);
+      setError(null);
     }
   }, [nodeId]);
 
   const fetchRelationships = async () => {
+    if (!nodeId) {
+      setError("Node ID is missing");
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await axios.get(`/api/neo4j/nodes/${nodeId}/relationships`);
       if (response.data && response.data.inbound && response.data.outbound) {
-        setRelationships(response.data);
+        setRelationships({
+          inbound: response.data.inbound || [],
+          outbound: response.data.outbound || []
+        });
       } else {
         throw new Error('Formato de resposta inválido');
       }
@@ -59,6 +75,11 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
   };
 
   const handleDeleteRelationship = async (edgeId: string) => {
+    if (!edgeId) {
+      console.error('Edge ID is missing for deletion');
+      return;
+    }
+
     if (!window.confirm('Tem certeza que deseja excluir este relacionamento?')) {
       return;
     }
@@ -74,12 +95,18 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
   };
 
   const handleNodeClick = (node: Node) => {
+    if (!node) {
+      console.warn('Attempted to select a null node');
+      return;
+    }
+    
     if (onNodeSelect) {
       onNodeSelect(node);
     }
   };
 
   const getRelationshipColor = (type: string): string => {
+    if (!type) return '#888888'; // Default gray color
     return relationshipColors[type.toUpperCase()] || relationshipColors.default;
   };
 
@@ -119,30 +146,34 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
           >
             Atualizar
           </Button>
-          <Link href={`/admin/graph-edges/new?source=${nodeId}`}>
-            <Button 
-              size="sm"
-              icon={<PlusIcon className="h-4 w-4" />}
-            >
-              Adicionar
-            </Button>
-          </Link>
+          {nodeId && (
+            <Link href={`/admin/graph-edges/new?source=${nodeId}`}>
+              <Button 
+                size="sm"
+                icon={<PlusIcon className="h-4 w-4" />}
+              >
+                Adicionar
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
       {!hasRelationships ? (
         <div className="p-4 text-center bg-gray-50 rounded-md">
           <p className="text-gray-500">Nenhum relacionamento encontrado para este nó.</p>
-          <Link href={`/admin/graph-edges/new?source=${nodeId}`}>
-            <Button
-              className="mt-2"
-              size="sm"
-              variant="outline"
-              icon={<PlusIcon className="h-4 w-4" />}
-            >
-              Adicionar Relacionamento
-            </Button>
-          </Link>
+          {nodeId && (
+            <Link href={`/admin/graph-edges/new?source=${nodeId}`}>
+              <Button
+                className="mt-2"
+                size="sm"
+                variant="outline"
+                icon={<PlusIcon className="h-4 w-4" />}
+              >
+                Adicionar Relacionamento
+              </Button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
@@ -154,7 +185,7 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
               </h4>
               <ul className="space-y-2">
                 {relationships.outbound.map(({ edge, node }) => (
-                  <li key={edge.id} className="p-3 bg-white border rounded-md hover:bg-neutral-50">
+                  <li key={edge?.id || Math.random()} className="p-3 bg-white border rounded-md hover:bg-neutral-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center">
@@ -162,19 +193,19 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
                           <ArrowRightIcon className="h-4 w-4 mx-2 text-gray-400" />
                           <button 
                             className="text-sm font-medium text-computing-purple hover:underline"
-                            onClick={() => handleNodeClick(node)}
+                            onClick={() => node && handleNodeClick(node)}
                           >
-                            {node.properties.name || `ID: ${node.id.substring(0, 8)}`}
+                            {node?.properties?.name || `ID: ${node?.id?.substring(0, 8) || 'Unknown'}`}
                           </button>
                         </div>
                         <div className="mt-1 flex items-center">
                           <span 
                             className="px-2 py-0.5 text-xs font-medium text-white rounded-full"
-                            style={{ backgroundColor: getRelationshipColor(edge.type) }}
+                            style={{ backgroundColor: getRelationshipColor(edge?.type || '') }}
                           >
-                            {edge.type}
+                            {edge?.type || 'Unknown'}
                           </span>
-                          {edge.properties.description && (
+                          {edge?.properties?.description && (
                             <span className="ml-2 text-xs text-gray-500">
                               {edge.properties.description.length > 50
                                 ? `${edge.properties.description.substring(0, 50)}...`
@@ -184,21 +215,27 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
                         </div>
                       </div>
                       <div className="flex space-x-1">
-                        <Link href={`/admin/graph-edges/edit/${edge.id}`}>
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            icon={<PencilSquareIcon className="h-3 w-3" />}
-                          />
-                        </Link>
-                        <Button
-                          onClick={() => handleDeleteRelationship(edge.id)}
-                          variant="danger"
-                          size="sm"
-                          className="ml-2"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
+                        {edge?.id && (
+                          <>
+                            <Link href={`/admin/graph-edges/edit/${edge.id}`}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="py-1"
+                              >
+                                <PencilSquareIcon className="h-3 w-3" />
+                              </Button>
+                            </Link>
+                            <Button
+                              onClick={() => edge?.id && handleDeleteRelationship(edge.id)}
+                              variant="danger"
+                              size="sm"
+                              className="ml-2"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -215,15 +252,15 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
               </h4>
               <ul className="space-y-2">
                 {relationships.inbound.map(({ edge, node }) => (
-                  <li key={edge.id} className="p-3 bg-white border rounded-md hover:bg-neutral-50">
+                  <li key={edge?.id || Math.random()} className="p-3 bg-white border rounded-md hover:bg-neutral-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center">
                           <button 
                             className="text-sm font-medium text-computing-purple hover:underline"
-                            onClick={() => handleNodeClick(node)}
+                            onClick={() => node && handleNodeClick(node)}
                           >
-                            {node.properties.name || `ID: ${node.id.substring(0, 8)}`}
+                            {node?.properties?.name || `ID: ${node?.id?.substring(0, 8) || 'Unknown'}`}
                           </button>
                           <ArrowRightIcon className="h-4 w-4 mx-2 text-gray-400" />
                           <span className="text-sm font-medium">Este nó</span>
@@ -231,11 +268,11 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
                         <div className="mt-1 flex items-center">
                           <span 
                             className="px-2 py-0.5 text-xs font-medium text-white rounded-full"
-                            style={{ backgroundColor: getRelationshipColor(edge.type) }}
+                            style={{ backgroundColor: getRelationshipColor(edge?.type || '') }}
                           >
-                            {edge.type}
+                            {edge?.type || 'Unknown'}
                           </span>
-                          {edge.properties.description && (
+                          {edge?.properties?.description && (
                             <span className="ml-2 text-xs text-gray-500">
                               {edge.properties.description.length > 50
                                 ? `${edge.properties.description.substring(0, 50)}...`
@@ -245,21 +282,27 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
                         </div>
                       </div>
                       <div className="flex space-x-1">
-                        <Link href={`/admin/graph-edges/edit/${edge.id}`}>
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            icon={<PencilSquareIcon className="h-3 w-3" />}
-                          />
-                        </Link>
-                        <Button
-                          onClick={() => handleDeleteRelationship(edge.id)}
-                          variant="danger"
-                          size="sm"
-                          className="ml-2"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
+                        {edge?.id && (
+                          <>
+                            <Link href={`/admin/graph-edges/edit/${edge.id}`}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="py-1"
+                              >
+                                <PencilSquareIcon className="h-3 w-3" />
+                              </Button>
+                            </Link>
+                            <Button
+                              onClick={() => edge.id && handleDeleteRelationship(edge.id)}
+                              variant="danger"
+                              size="sm"
+                              className="ml-2"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -273,4 +316,4 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
   );
 };
 
-export default NodeRelationships; 
+export default NodeRelationships;

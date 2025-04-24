@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neo4jService } from '@/services/neo4jService';
+import neo4jService from '@/services/neo4jService';
 
 export default async function handler(
   req: NextApiRequest,
@@ -37,11 +37,11 @@ export default async function handler(
       
       const result = await neo4jService.executeQuery(query, { id: parseInt(id, 10) });
       
-      if (result.records.length === 0) {
+      if (!result.success || !result.results || result.results.length === 0) {
         return res.status(404).json({ error: 'Nó não encontrado' });
       }
       
-      const record = result.records[0];
+      const record = result.results[0];
       const node = record.get('n');
       const outgoingRelationships = record.get('outgoingRelationships')
         .filter((rel: any) => rel.id !== null);
@@ -81,7 +81,7 @@ export default async function handler(
       
       const checkResult = await neo4jService.executeQuery(checkQuery, { id: parseInt(id, 10) });
       
-      if (checkResult.records.length === 0) {
+      if (!checkResult.success || !checkResult.results || checkResult.results.length === 0) {
         return res.status(404).json({ error: 'Nó não encontrado' });
       }
       
@@ -117,7 +117,11 @@ export default async function handler(
         properties
       });
       
-      const node = result.records[0].get('n');
+      if (!result.success || !result.results || result.results.length === 0) {
+        return res.status(500).json({ error: 'Erro ao atualizar o nó' });
+      }
+      
+      const node = result.results[0].get('n');
       
       return res.status(200).json({
         id: node.identity.toString(),
@@ -142,7 +146,7 @@ export default async function handler(
       
       const checkResult = await neo4jService.executeQuery(checkQuery, { id: parseInt(id, 10) });
       
-      if (checkResult.records.length === 0) {
+      if (!checkResult.success || !checkResult.results || checkResult.results.length === 0) {
         return res.status(404).json({ error: 'Nó não encontrado' });
       }
       

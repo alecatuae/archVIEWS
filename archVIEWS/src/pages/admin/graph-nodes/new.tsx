@@ -298,7 +298,7 @@ export default function NewGraphNode() {
                   {index >= 7 && (
                     <Button
                       type="button"
-                      variant="danger-outline"
+                      variant="danger"
                       size="sm"
                       icon={<XMarkIcon className="h-4 w-4" />}
                       onClick={() => removeProperty(index)}

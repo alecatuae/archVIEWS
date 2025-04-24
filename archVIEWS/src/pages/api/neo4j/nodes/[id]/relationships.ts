@@ -54,7 +54,7 @@ async function getNodeRelationships(req: NextApiRequest, res: NextApiResponse, i
     const outboundResult = await neo4jService.executeQuery(outboundQuery, { nodeId: parseInt(id) });
     
     // Processar resultados
-    const inboundRelationships = inboundResult.success ? inboundResult.results.map(record => {
+    const inboundRelationships = inboundResult.success && inboundResult.results ? inboundResult.results.map(record => {
       return {
         edge: {
           id: record.r.identity.toString(),
@@ -71,7 +71,7 @@ async function getNodeRelationships(req: NextApiRequest, res: NextApiResponse, i
       };
     }) : [];
     
-    const outboundRelationships = outboundResult.success ? outboundResult.results.map(record => {
+    const outboundRelationships = outboundResult.success && outboundResult.results ? outboundResult.results.map(record => {
       return {
         edge: {
           id: record.r.identity.toString(),

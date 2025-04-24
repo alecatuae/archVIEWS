@@ -61,131 +61,104 @@ export function formatEdgeLabel(edge: Edge): string {
   return label;
 }
 
-export function getCytoscapeStylesheet() {
+export function getCytoscapeStylesheet(): any[] {
   return [
     {
       selector: 'node',
       style: {
-        'label': 'data(label)',
-        'background-color': '#6b48ff',
-        'width': 50,
-        'height': 50,
-        'text-valign': 'center',
+        'background-color': (ele: any) => {
+          const nodeType = ele.data('properties')?.category?.toLowerCase() || '';
+          if (nodeType.includes('server')) return '#6b48ff'; // Computing purple
+          if (nodeType.includes('storage')) return '#0897e9'; // Storage blue
+          if (nodeType.includes('network') || nodeType.includes('firewall')) return '#0adbe3'; // Network blue
+          if (nodeType.includes('internet')) return '#0adbe3'; // Network blue
+          return '#888888'; // Default gray
+        },
+        'shape': (ele: any) => {
+          const nodeType = ele.data('properties')?.category?.toLowerCase() || '';
+          if (nodeType.includes('server')) return 'rectangle';
+          if (nodeType.includes('storage')) return 'barrel';
+          if (nodeType.includes('firewall')) return 'pentagon';
+          if (nodeType.includes('internet')) return 'ellipse';
+          return 'ellipse';
+        },
+        'width': '50px',
+        'height': '50px',
+        'border-width': 2,
+        'border-color': '#ffffff',
+        'text-valign': 'bottom',
         'text-halign': 'center',
-        'text-outline-width': 2,
-        'text-outline-color': '#ffffff',
-        'font-size': 12,
-        'color': '#000000'
-      }
-    },
-    {
-      selector: 'node.ic',
-      style: {
-        'background-color': '#6b48ff' // computing-purple
-      }
-    },
-    {
-      selector: 'node.application',
-      style: {
-        'background-color': '#6b48ff' // computing-purple
-      }
-    },
-    {
-      selector: 'node.database',
-      style: {
-        'background-color': '#0897e9' // storage-blue
-      }
-    },
-    {
-      selector: 'node.storage',
-      style: {
-        'background-color': '#0897e9' // storage-blue
-      }
-    },
-    {
-      selector: 'node.network',
-      style: {
-        'background-color': '#0adbe3' // network-blue
+        'text-margin-y': 10,
+        'font-size': '12px',
+        'color': '#333333',
+        'label': 'data(label)',
+        'text-wrap': 'wrap',
+        'text-max-width': '80px',
+        'font-weight': 'bold',
+        'text-background-color': '#ffffff',
+        'text-background-opacity': 0.7,
+        'text-background-padding': '2px',
+        'text-background-shape': 'roundrectangle'
       }
     },
     {
       selector: 'edge',
       style: {
-        'width': 3,
-        'line-color': '#363636', // neutral-gray
-        'target-arrow-color': '#363636',
+        'width': 2,
+        'line-color': (ele: any) => {
+          const relType = ele.data('label') || '';
+          if (relType.includes('COMMUNICATES_WITH')) return '#0adbe3'; // Network color
+          if (relType.includes('DEPENDS_ON')) return '#feac0e'; // Dependency color
+          if (relType.includes('HOSTED_ON')) return '#6b48ff'; // Computing color
+          if (relType.includes('REPLICATES_TO')) return '#6b48ff'; // Computing color
+          if (relType.includes('USES')) return '#0897e9'; // Storage color
+          if (relType.includes('STORES_DATA_IN')) return '#0897e9'; // Storage color
+          return '#888888'; // Default gray
+        },
+        'target-arrow-color': (ele: any) => {
+          const relType = ele.data('label') || '';
+          if (relType.includes('COMMUNICATES_WITH')) return '#0adbe3'; // Network color
+          if (relType.includes('DEPENDS_ON')) return '#feac0e'; // Dependency color
+          if (relType.includes('HOSTED_ON')) return '#6b48ff'; // Computing color
+          if (relType.includes('REPLICATES_TO')) return '#6b48ff'; // Computing color
+          if (relType.includes('USES')) return '#0897e9'; // Storage color
+          if (relType.includes('STORES_DATA_IN')) return '#0897e9'; // Storage color
+          return '#888888'; // Default gray
+        },
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
         'label': 'data(label)',
-        'font-size': 10,
-        'text-outline-width': 2,
-        'text-outline-color': '#ffffff'
-      }
-    },
-    {
-      selector: 'edge.depends_on',
-      style: {
-        'line-color': '#feac0e', // dependency-orange
-        'target-arrow-color': '#feac0e'
-      }
-    },
-    {
-      selector: 'edge.communicates_with',
-      style: {
-        'line-color': '#0adbe3', // network-blue
-        'target-arrow-color': '#0adbe3'
-      }
-    },
-    {
-      selector: 'edge.stores_data_in',
-      style: {
-        'line-color': '#0897e9', // storage-blue
-        'target-arrow-color': '#0897e9'
-      }
-    },
-    {
-      selector: 'edge.network',
-      style: {
-        'line-color': '#0adbe3', // network-blue
-        'target-arrow-color': '#0adbe3'
-      }
-    },
-    {
-      selector: 'edge.computing',
-      style: {
-        'line-color': '#6b48ff', // computing-purple
-        'target-arrow-color': '#6b48ff'
-      }
-    },
-    {
-      selector: 'edge.storage',
-      style: {
-        'line-color': '#0897e9', // storage-blue
-        'target-arrow-color': '#0897e9'
-      }
-    },
-    {
-      selector: 'edge.uses',
-      style: {
-        'line-color': '#0897e9', // storage-blue
-        'target-arrow-color': '#0897e9'
-      }
-    },
-    {
-      selector: 'edge.contains',
-      style: {
-        'line-color': '#363636', // neutral-gray
-        'target-arrow-color': '#363636'
+        'font-size': '10px',
+        'text-rotation': 'autorotate',
+        'text-background-color': '#ffffff',
+        'text-background-opacity': 0.7,
+        'text-background-padding': '2px',
+        'text-background-shape': 'roundrectangle',
+        'edge-text-rotation': 'autorotate'
       }
     },
     {
       selector: ':selected',
       style: {
-        'background-color': '#feac0e',
-        'line-color': '#feac0e',
-        'target-arrow-color': '#feac0e',
-        'source-arrow-color': '#feac0e',
-        'text-outline-color': '#feac0e'
+        'background-color': (ele: any) => {
+          if (ele.isNode()) {
+            // Manter a cor, mas destacar de alguma forma
+            const nodeType = ele.data('properties')?.category?.toLowerCase() || '';
+            if (nodeType.includes('server')) return '#8f76ff'; // Lighten Computing purple
+            if (nodeType.includes('storage')) return '#60b5f7'; // Lighten Storage blue
+            if (nodeType.includes('network') || nodeType.includes('firewall')) return '#6fe6eb'; // Lighten Network blue
+            if (nodeType.includes('internet')) return '#6fe6eb'; // Lighten Network blue
+            return '#aaaaaa'; // Lighten Default gray
+          }
+          return '#ffcc00'; // Highlight color for edges
+        },
+        'border-width': 3,
+        'border-color': '#ffcc00',
+        'line-color': '#ffcc00',
+        'target-arrow-color': '#ffcc00',
+        'source-arrow-color': '#ffcc00',
+        'text-outline-width': 3,
+        'text-outline-color': '#ffcc00'
       }
     }
   ];

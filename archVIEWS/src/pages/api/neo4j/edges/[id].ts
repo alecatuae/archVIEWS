@@ -99,6 +99,11 @@ async function updateEdge(req: NextApiRequest, res: NextApiResponse, id: string)
       throw new Error(updateResult.message || 'Erro ao atualizar relacionamento');
     }
     
+    // Verificar se há resultados
+    if (!updateResult.results || updateResult.results.length === 0) {
+      throw new Error('Relacionamento atualizado não encontrado');
+    }
+    
     // Processar os dados do relacionamento atualizado
     const record = updateResult.results[0];
     

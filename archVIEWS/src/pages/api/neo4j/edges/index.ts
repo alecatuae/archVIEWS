@@ -40,17 +40,19 @@ async function getEdges(req: NextApiRequest, res: NextApiResponse) {
     }
     
     // Processar os resultados para o formato esperado
-    const edges = result.results.map(record => {
-      const relationship = record.r;
-      
-      return {
-        id: relationship.identity.toString(),
-        type: relationship.type,
-        source: record.n.identity.toString(),
-        target: record.m.identity.toString(),
-        properties: relationship.properties
-      };
-    });
+    const edges = result.results && result.results.length > 0 
+      ? result.results.map(record => {
+          const relationship = record.r;
+          
+          return {
+            id: relationship.identity.toString(),
+            type: relationship.type,
+            source: record.n.identity.toString(),
+            target: record.m.identity.toString(),
+            properties: relationship.properties
+          };
+        })
+      : [];
     
     return res.status(200).json(edges);
   } catch (error: any) {
@@ -104,6 +106,10 @@ async function createEdge(req: NextApiRequest, res: NextApiResponse) {
     }
     
     // Obter o relacionamento criado da resposta
+    if (!createResult.results || createResult.results.length === 0) {
+      throw new Error('Relacionamento criado mas não foi possível obter os dados de resultado');
+    }
+    
     const record = createResult.results[0];
     
     if (!record || !record.r) {

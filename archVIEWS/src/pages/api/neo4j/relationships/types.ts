@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neo4jService } from '@/services/neo4jService';
+import neo4jService from '@/services/neo4jService';
 
 type RelationshipTypeResponse = {
   type: string;
@@ -34,8 +34,12 @@ export default async function handler(
       environmentFilter ? { environment: environmentFilter } : {}
     );
 
+    if (!result.success || !result.results) {
+      return res.status(500).json({ error: 'Erro ao buscar tipos de relacionamento' });
+    }
+
     // Formata a resposta
-    const relationshipTypes = result.records.map(record => ({
+    const relationshipTypes = result.results.map(record => ({
       type: record.get('relType'),
       count: record.get('count').toNumber()
     }));

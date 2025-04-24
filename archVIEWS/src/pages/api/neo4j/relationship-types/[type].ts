@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neo4jService } from '@/services/neo4jService';
+import neo4jService from '@/services/neo4jService';
 
 export default async function handler(
   req: NextApiRequest,
@@ -45,8 +45,12 @@ export default async function handler(
       }
     );
 
+    if (!result.success || !result.results) {
+      return res.status(500).json({ error: 'Erro ao buscar relacionamentos' });
+    }
+
     // Formata a resposta
-    const relationships = result.records.map(record => {
+    const relationships = result.results.map(record => {
       const source = record.get('source').properties;
       const target = record.get('target').properties;
       const relationship = {
@@ -80,7 +84,11 @@ export default async function handler(
       environmentFilter ? { environment: environmentFilter } : {}
     );
     
-    const total = countResult.records[0].get('total').toNumber();
+    if (!countResult.success || !countResult.results || countResult.results.length === 0) {
+      return res.status(500).json({ error: 'Erro ao contar relacionamentos' });
+    }
+    
+    const total = countResult.results[0].get('total').toNumber();
 
     return res.status(200).json({
       relationships,

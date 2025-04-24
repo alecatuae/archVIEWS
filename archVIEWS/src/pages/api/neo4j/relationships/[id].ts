@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neo4jService } from '@/services/neo4jService';
+import neo4jService from '@/services/neo4jService';
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,12 +27,12 @@ export default async function handler(
 
       const result = await neo4jService.executeQuery(query, { relationshipId });
 
-      if (result.records.length === 0) {
+      if (!result.success || !result.results || result.results.length === 0) {
         return res.status(404).json({ error: 'Relacionamento não encontrado' });
       }
 
       // Formatar a resposta
-      const record = result.records[0];
+      const record = result.results[0];
       const rel = record.get('r');
       const source = record.get('source');
       const target = record.get('target');
@@ -76,7 +76,7 @@ export default async function handler(
 
       const checkResult = await neo4jService.executeQuery(checkQuery, { relationshipId });
 
-      if (checkResult.records.length === 0) {
+      if (!checkResult.success || !checkResult.results || checkResult.results.length === 0) {
         return res.status(404).json({ error: 'Relacionamento não encontrado' });
       }
 
@@ -93,8 +93,12 @@ export default async function handler(
         properties 
       });
 
+      if (!updateResult.success || !updateResult.results || updateResult.results.length === 0) {
+        throw new Error('Erro ao atualizar o relacionamento');
+      }
+
       // Formatar a resposta
-      const record = updateResult.records[0];
+      const record = updateResult.results[0];
       const rel = record.get('r');
       const source = record.get('source');
       const target = record.get('target');
@@ -132,7 +136,7 @@ export default async function handler(
 
       const checkResult = await neo4jService.executeQuery(checkQuery, { relationshipId });
 
-      if (checkResult.records.length === 0) {
+      if (!checkResult.success || !checkResult.results || checkResult.results.length === 0) {
         return res.status(404).json({ error: 'Relacionamento não encontrado' });
       }
 
@@ -145,7 +149,12 @@ export default async function handler(
       `;
 
       const deleteResult = await neo4jService.executeQuery(deleteQuery, { relationshipId });
-      const deleted = deleteResult.records[0].get('deleted').toNumber();
+
+      if (!deleteResult.success || !deleteResult.results || deleteResult.results.length === 0) {
+        throw new Error('Erro ao excluir o relacionamento');
+      }
+
+      const deleted = deleteResult.results[0].get('deleted').toNumber();
 
       if (deleted === 0) {
         return res.status(500).json({ error: 'Falha ao excluir relacionamento' });

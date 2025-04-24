@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neo4jService } from '@/services/neo4jService';
+import neo4jService from '@/services/neo4jService';
 
 interface CreateNodeData {
   labels: string[];
@@ -66,21 +66,32 @@ export default async function handler(
       // Adicionar contagem total
       const countQuery = `${query} RETURN count(n) as total`;
       const countResult = await neo4jService.executeQuery(countQuery, params);
-      const total = countResult.records[0].get('total').toNumber();
+      
+      if (!countResult.success || !countResult.results || countResult.results.length === 0) {
+        return res.status(500).json({ error: 'Erro ao contar os nós' });
+      }
+      
+      const total = countResult.results[0].get('total').toNumber();
       
       // Adicionar paginação e retornar resultados
       query += ' RETURN n ORDER BY n.name SKIP $offset LIMIT $limit';
       
       const result = await neo4jService.executeQuery(query, params);
       
-      const nodes = result.records.map(record => {
-        const node = record.get('n');
-        return {
-          id: node.identity.toString(),
-          labels: node.labels,
-          properties: node.properties
-        };
-      });
+      if (!result.success) {
+        throw new Error(result.message || 'Erro ao buscar nós');
+      }
+      
+      const nodes = result.results && result.results.length > 0 
+        ? result.results.map(record => {
+            const node = record.get('n');
+            return {
+              id: node.identity.toString(),
+              labels: node.labels,
+              properties: node.properties
+            };
+          })
+        : [];
       
       return res.status(200).json({
         nodes,
@@ -125,11 +136,11 @@ export default async function handler(
       
       const result = await neo4jService.executeQuery(query, { properties });
       
-      if (result.records.length === 0) {
-        return res.status(500).json({ error: 'Falha ao criar o nó' });
+      if (!result.success || !result.results || result.results.length === 0) {
+        throw new Error('Nó criado mas não foi possível recuperar os dados');
       }
       
-      const node = result.records[0].get('n');
+      const node = result.results[0].get('n');
       
       return res.status(201).json({
         id: node.identity.toString(),

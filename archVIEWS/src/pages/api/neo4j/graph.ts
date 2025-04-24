@@ -80,7 +80,20 @@ export default async function handler(
     });
 
     // Transformar para o formato esperado da aplicação
-    const graphData = {
+    const graphData: { 
+      nodes: Array<{ 
+        id: string; 
+        labels: string[]; 
+        properties: any 
+      }>; 
+      edges: Array<{ 
+        id: string; 
+        source: string; 
+        target: string; 
+        type: string; 
+        properties: any 
+      }>
+    } = {
       nodes: [],
       edges: []
     };

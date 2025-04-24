@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neo4jService } from '@/services/neo4jService';
+import neo4jService from '@/services/neo4jService';
 
 interface CreateRelationshipData {
   sourceId: number;
@@ -79,7 +79,12 @@ export default async function handler(
       `;
 
       const countResult = await neo4jService.executeQuery(countQuery, params);
-      const total = countResult.records[0].get('total').toNumber();
+      
+      if (!countResult.success || !countResult.results || countResult.results.length === 0) {
+        return res.status(500).json({ error: 'Erro ao contar os relacionamentos' });
+      }
+      
+      const total = countResult.results[0].get('total').toNumber();
 
       // Query final para retornar os relacionamentos com paginação
       query += `
@@ -93,29 +98,34 @@ export default async function handler(
       params.limit = actualLimit;
 
       const result = await neo4jService.executeQuery(query, params);
-
-      // Transformar os resultados
-      const relationships = result.records.map(record => {
-        const rel = record.get('r');
-        const source = record.get('source');
-        const target = record.get('target');
-
-        return {
-          id: rel.identity.toString(),
-          type: rel.type,
-          properties: rel.properties,
-          source: {
-            id: source.identity.toString(),
-            labels: source.labels,
-            properties: source.properties
-          },
-          target: {
-            id: target.identity.toString(),
-            labels: target.labels,
-            properties: target.properties
-          }
-        };
-      });
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Erro ao buscar relacionamentos');
+      }
+      
+      const relationships = result.results && result.results.length > 0 
+        ? result.results.map(record => {
+            const relationship = record.get('r');
+            const source = record.get('source');
+            const target = record.get('target');
+            
+            return {
+              id: relationship.identity.toString(),
+              type: relationship.type,
+              properties: relationship.properties,
+              source: {
+                id: source.identity.toString(),
+                labels: source.labels,
+                properties: source.properties
+              },
+              target: {
+                id: target.identity.toString(),
+                labels: target.labels,
+                properties: target.properties
+              }
+            };
+          })
+        : [];
 
       return res.status(200).json({
         relationships,
@@ -156,8 +166,8 @@ export default async function handler(
         targetId 
       });
 
-      if (checkResult.records.length === 0) {
-        return res.status(404).json({ error: 'Um ou ambos os nós não foram encontrados' });
+      if (!checkResult.success || !checkResult.results || checkResult.results.length === 0) {
+        return res.status(404).json({ error: 'Nós de origem ou destino não encontrados' });
       }
 
       // Verificar se o relacionamento já existe
@@ -169,13 +179,12 @@ export default async function handler(
 
       const checkRelResult = await neo4jService.executeQuery(checkRelQuery, { 
         sourceId, 
-        targetId 
+        targetId, 
+        type 
       });
 
-      if (checkRelResult.records.length > 0) {
-        return res.status(409).json({ 
-          error: 'Já existe um relacionamento deste tipo entre os nós especificados' 
-        });
+      if (checkRelResult.success && checkRelResult.results && checkRelResult.results.length > 0) {
+        return res.status(409).json({ error: `Já existe um relacionamento do tipo ${type} entre os nós especificados` });
       }
 
       // Criar o relacionamento
@@ -191,9 +200,13 @@ export default async function handler(
         targetId, 
         properties 
       });
+      
+      if (!createResult.success || !createResult.results || createResult.results.length === 0) {
+        throw new Error('Erro ao criar o relacionamento');
+      }
 
       // Formatar a resposta
-      const record = createResult.records[0];
+      const record = createResult.results[0];
       const rel = record.get('r');
       const source = record.get('source');
       const target = record.get('target');

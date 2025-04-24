@@ -167,7 +167,7 @@ export default function Admin() {
                       <Link href={`/admin/components/edit/${component.id}`}>
                         <Button
                           variant="outline"
-                          size="xs"
+                          size="sm"
                           icon={<PencilSquareIcon className="h-4 w-4" />}
                         >
                           Editar
@@ -175,7 +175,7 @@ export default function Admin() {
                       </Link>
                       <Button
                         variant="danger"
-                        size="xs"
+                        size="sm"
                         icon={<TrashIcon className="h-4 w-4" />}
                         onClick={() => handleDeleteComponent(component.id, component.name)}
                       >

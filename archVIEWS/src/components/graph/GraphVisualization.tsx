@@ -4,33 +4,42 @@ import { transformToCytoscapeFormat, getCytoscapeStylesheet, getNodeDisplayLabel
 import { MagnifyingGlassPlusIcon as ZoomInIcon, 
          MagnifyingGlassMinusIcon as ZoomOutIcon, 
          ArrowsPointingOutIcon, 
-         ArrowPathIcon, 
-         ViewfinderCircleIcon } from '@heroicons/react/24/outline';
+         ArrowPathIcon } from '@heroicons/react/24/outline';
 import GraphAlternative from './GraphAlternative';
 import dynamic from 'next/dynamic';
 import cytoscape from 'cytoscape';
-
-// Registre extensões do Cytoscape apenas no lado do cliente
-if (typeof window !== 'undefined') {
-  // Importações dinâmicas para evitar problemas no SSR
-  import('cytoscape-cola')
-    .then((colaModule) => {
-      const cola = colaModule.default;
-      // Evite registrar mais de uma vez
-      if (!cytoscape.prototype.hasInitialised) {
-        cytoscape.use(cola);
-      }
-    })
-    .catch(err => {
-      console.error('Error loading cytoscape-cola:', err);
-    });
-}
+import cola from 'cytoscape-cola';
+import { PlusIcon, MinusIcon } from '@heroicons/react/24/outline';
 
 // Carregue o componente React-Cytoscape dinamicamente para evitar erros de SSR
 const CytoscapeComponent = dynamic(
   () => import('react-cytoscapejs'),
   { ssr: false }
 );
+
+// Registrar extensões necessárias
+if (typeof window !== 'undefined') {
+  try {
+    // Evite registrar mais de uma vez
+    if (!cytoscape.prototype.hasInitialised) {
+      cytoscape.use(cola);
+      
+      // Evitamos problemas com TypeScript registrando o popper com uma função assíncrona
+      import('cytoscape-popper').then(module => {
+        try {
+          // @ts-ignore: Ignorar erro de tipagem ao registrar o popper
+          cytoscape.use(module.default);
+        } catch (err) {
+          console.error('Error registering popper extension:', err);
+        }
+      });
+      
+      cytoscape.prototype.hasInitialised = true;
+    }
+  } catch (err) {
+    console.error('Error registering Cytoscape extensions:', err);
+  }
+}
 
 interface GraphVisualizationProps {
   data: GraphData;
@@ -55,18 +64,18 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
   const [isCytoscapeAvailable, setIsCytoscapeAvailable] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [showMinimap, setShowMinimap] = useState<boolean>(false);
 
   // Transforma os dados para o formato do Cytoscape
   useEffect(() => {
     try {
-      if (data && data.nodes && data.edges) {
-        const transformed = transformToCytoscapeFormat(data);
-        setCytoscapeData(transformed);
+      if (data && data.nodes && data.nodes.length > 0) {
+        const formattedData = transformToCytoscapeFormat(data);
+        setCytoscapeData(formattedData);
+      } else {
+        setCytoscapeData({ nodes: [], edges: [] });
       }
-    } catch (err) {
-      console.error('Error transforming data for Cytoscape:', err);
-      setError(err instanceof Error ? err : new Error('Unknown error transforming data'));
+    } catch (error) {
+      console.error('Error transforming data for Cytoscape:', error);
       setIsCytoscapeAvailable(false);
     }
   }, [data]);
@@ -75,133 +84,173 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
   useEffect(() => {
     if (cyRef.current) {
       const updateZoomLevel = () => {
-        setZoomLevel(cyRef.current?.zoom() || 1);
+        if (cyRef.current) {
+          setZoomLevel(cyRef.current.zoom() || 1);
+        }
       };
       
       cyRef.current.on('zoom', updateZoomLevel);
       
       return () => {
-        cyRef.current?.removeListener('zoom', updateZoomLevel);
+        if (cyRef.current) {
+          cyRef.current.removeListener('zoom', updateZoomLevel);
+        }
       };
     }
   }, [cyRef.current]);
 
   // Configuração de tooltips
   const setupTooltips = useCallback((cy: cytoscape.Core) => {
-    // Tooltip para nós
-    cy.nodes().on('mouseover', (event) => {
-      const node = event.target;
-      const nodeData = node.data();
-      
-      // Criação do elemento tooltip
-      const tooltip = document.createElement('div');
-      tooltip.className = 'cy-tooltip';
-      tooltip.innerHTML = `
-        <div class="bg-black/80 text-white text-xs rounded py-1 px-2 pointer-events-none absolute z-10 max-w-xs">
-          <div class="font-bold">${nodeData.label}</div>
-          <div class="text-gray-300">${nodeData.properties.description || 'No description'}</div>
-          <div class="text-gray-400 text-[10px] mt-1">${nodeData.properties.category || 'No category'}</div>
-        </div>
-      `;
-      
-      document.body.appendChild(tooltip);
-      
-      // Posicionamento do tooltip
-      const updateTooltipPosition = () => {
-        const renderedPosition = node.renderedPosition();
-        const containerRect = containerRef.current?.getBoundingClientRect();
-        
-        if (containerRect) {
-          tooltip.style.left = `${containerRect.left + renderedPosition.x + 10}px`;
-          tooltip.style.top = `${containerRect.top + renderedPosition.y - 10}px`;
-        }
-      };
-      
-      // Atualizar posição inicial
-      updateTooltipPosition();
-      
-      // Remover tooltip quando o mouse sair
-      node.one('mouseout', () => {
-        document.body.removeChild(tooltip);
-      });
-      
-      // Atualizar posição quando ocorrer zoom ou pan
-      cy.on('pan zoom', updateTooltipPosition);
-      
-      // Limpar eventos quando o tooltip for removido
-      node.one('mouseout', () => {
-        cy.removeListener('pan zoom', updateTooltipPosition);
-      });
-    });
+    if (!cy) return;
     
-    // Tooltip para arestas
-    cy.edges().on('mouseover', (event) => {
-      const edge = event.target;
-      const edgeData = edge.data();
-      const sourceNode = cy.getElementById(edgeData.source).data();
-      const targetNode = cy.getElementById(edgeData.target).data();
-      
-      // Criação do elemento tooltip
-      const tooltip = document.createElement('div');
-      tooltip.className = 'cy-tooltip';
-      tooltip.innerHTML = `
-        <div class="bg-black/80 text-white text-xs rounded py-1 px-2 pointer-events-none absolute z-10 max-w-xs">
-          <div class="font-bold">${edgeData.label}</div>
-          <div class="text-gray-300">${edgeData.properties.description || 'No description'}</div>
-          <div class="text-gray-400 text-[10px] mt-1">${sourceNode.label} → ${targetNode.label}</div>
-        </div>
-      `;
-      
-      document.body.appendChild(tooltip);
-      
-      // Posicionamento do tooltip
-      const updateTooltipPosition = () => {
-        const midpoint = edge.midpoint();
-        const containerRect = containerRef.current?.getBoundingClientRect();
+    try {
+      // Tooltip para nós
+      cy.nodes().on('mouseover', (event) => {
+        if (!event.target || !event.target.data) return;
         
-        if (containerRect) {
-          tooltip.style.left = `${containerRect.left + midpoint.x + 10}px`;
-          tooltip.style.top = `${containerRect.top + midpoint.y - 10}px`;
-        }
-      };
-      
-      // Atualizar posição inicial
-      updateTooltipPosition();
-      
-      // Remover tooltip quando o mouse sair
-      edge.one('mouseout', () => {
-        document.body.removeChild(tooltip);
+        const node = event.target;
+        const nodeData = node.data();
+        
+        if (!nodeData) return;
+        
+        // Criação do elemento tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'cy-tooltip';
+        tooltip.innerHTML = `
+          <div class="bg-black/80 text-white text-xs rounded py-1 px-2 pointer-events-none absolute z-10 max-w-xs">
+            <div class="font-bold">${nodeData.label || 'No Label'}</div>
+            <div class="text-gray-300">${(nodeData.properties && nodeData.properties.description) || 'No description'}</div>
+            <div class="text-gray-400 text-[10px] mt-1">${(nodeData.properties && nodeData.properties.category) || 'No category'}</div>
+          </div>
+        `;
+        
+        document.body.appendChild(tooltip);
+        
+        // Posicionamento do tooltip
+        const updateTooltipPosition = () => {
+          if (!node || !containerRef.current) return;
+          
+          const renderedPosition = node.renderedPosition();
+          const containerRect = containerRef.current.getBoundingClientRect();
+          
+          if (containerRect) {
+            tooltip.style.left = `${containerRect.left + renderedPosition.x + 10}px`;
+            tooltip.style.top = `${containerRect.top + renderedPosition.y - 10}px`;
+          }
+        };
+        
+        // Atualizar posição inicial
+        updateTooltipPosition();
+        
+        // Remover tooltip quando o mouse sair
+        node.one('mouseout', () => {
+          if (document.body.contains(tooltip)) {
+            document.body.removeChild(tooltip);
+          }
+        });
+        
+        // Atualizar posição quando ocorrer zoom ou pan
+        cy.on('pan zoom', updateTooltipPosition);
+        
+        // Limpar eventos quando o tooltip for removido
+        node.one('mouseout', () => {
+          cy.removeListener('pan zoom', updateTooltipPosition);
+        });
       });
       
-      // Atualizar posição quando ocorrer zoom ou pan
-      cy.on('pan zoom', updateTooltipPosition);
-      
-      // Limpar eventos quando o tooltip for removido
-      edge.one('mouseout', () => {
-        cy.removeListener('pan zoom', updateTooltipPosition);
+      // Tooltip para arestas
+      cy.edges().on('mouseover', (event) => {
+        if (!event.target || !event.target.data) return;
+        
+        const edge = event.target;
+        const edgeData = edge.data();
+        
+        if (!edgeData || !edgeData.source || !edgeData.target) return;
+        
+        const sourceNode = cy.getElementById(edgeData.source);
+        const targetNode = cy.getElementById(edgeData.target);
+        
+        if (!sourceNode || !targetNode || !sourceNode.data() || !targetNode.data()) return;
+        
+        const sourceNodeData = sourceNode.data();
+        const targetNodeData = targetNode.data();
+        
+        // Criação do elemento tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'cy-tooltip';
+        tooltip.innerHTML = `
+          <div class="bg-black/80 text-white text-xs rounded py-1 px-2 pointer-events-none absolute z-10 max-w-xs">
+            <div class="font-bold">${edgeData.label || 'No Label'}</div>
+            <div class="text-gray-300">${(edgeData.properties && edgeData.properties.description) || 'No description'}</div>
+            <div class="text-gray-400 text-[10px] mt-1">${sourceNodeData.label || 'Source'} → ${targetNodeData.label || 'Target'}</div>
+          </div>
+        `;
+        
+        document.body.appendChild(tooltip);
+        
+        // Posicionamento do tooltip
+        const updateTooltipPosition = () => {
+          if (!edge || !containerRef.current) return;
+          
+          const midpoint = edge.midpoint();
+          const containerRect = containerRef.current.getBoundingClientRect();
+          
+          if (containerRect) {
+            tooltip.style.left = `${containerRect.left + midpoint.x + 10}px`;
+            tooltip.style.top = `${containerRect.top + midpoint.y - 10}px`;
+          }
+        };
+        
+        // Atualizar posição inicial
+        updateTooltipPosition();
+        
+        // Remover tooltip quando o mouse sair
+        edge.one('mouseout', () => {
+          if (document.body.contains(tooltip)) {
+            document.body.removeChild(tooltip);
+          }
+        });
+        
+        // Atualizar posição quando ocorrer zoom ou pan
+        cy.on('pan zoom', updateTooltipPosition);
+        
+        // Limpar eventos quando o tooltip for removido
+        edge.one('mouseout', () => {
+          cy.removeListener('pan zoom', updateTooltipPosition);
+        });
       });
-    });
+    } catch (err) {
+      console.error('Error setting up tooltips:', err);
+    }
   }, []);
 
   // Manipuladores para interações com o grafo
   const handleNodeSelect = useCallback((event: cytoscape.EventObject) => {
-    if (!onNodeSelect) return;
+    if (!onNodeSelect || !event || !event.target) return;
     
-    const nodeId = event.target.id();
-    const selectedNode = data.nodes.find(node => node.id === nodeId) || null;
-    onNodeSelect(selectedNode);
+    try {
+      const nodeId = event.target.id();
+      const selectedNode = data.nodes.find(node => node.id === nodeId) || null;
+      onNodeSelect(selectedNode);
+    } catch (err) {
+      console.error('Error in node selection:', err);
+    }
   }, [data.nodes, onNodeSelect]);
 
   const handleEdgeSelect = useCallback((event: cytoscape.EventObject) => {
-    if (!onEdgeSelect) return;
+    if (!onEdgeSelect || !event || !event.target) return;
     
-    const edgeId = event.target.id();
-    const selectedEdge = data.edges.find(edge => edge.id === edgeId) || null;
-    onEdgeSelect(selectedEdge);
+    try {
+      const edgeId = event.target.id();
+      const selectedEdge = data.edges.find(edge => edge.id === edgeId) || null;
+      onEdgeSelect(selectedEdge);
+    } catch (err) {
+      console.error('Error in edge selection:', err);
+    }
   }, [data.edges, onEdgeSelect]);
 
   // Manipuladores de zoom e layout
-  const zoomIn = useCallback(() => {
+  const handleZoomIn = useCallback(() => {
     if (cyRef.current) {
       cyRef.current.zoom({
         level: cyRef.current.zoom() * 1.2,
@@ -210,7 +259,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
     }
   }, []);
 
-  const zoomOut = useCallback(() => {
+  const handleZoomOut = useCallback(() => {
     if (cyRef.current) {
       cyRef.current.zoom({
         level: cyRef.current.zoom() * 0.8,
@@ -219,7 +268,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
     }
   }, []);
 
-  const fitToScreen = useCallback(() => {
+  const handleFit = useCallback(() => {
     if (cyRef.current) {
       cyRef.current.fit();
     }
@@ -243,11 +292,15 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         console.error('Error applying cola layout:', err);
         
         // Fallback para um layout padrão se o cola falhar
-        const fallbackLayout = cyRef.current.layout({
-          name: 'circle',
-          animate: true
-        } as any);
-        fallbackLayout.run();
+        try {
+          const fallbackLayout = cyRef.current.layout({
+            name: 'circle',
+            animate: true
+          } as any);
+          fallbackLayout.run();
+        } catch (fallbackErr) {
+          console.error('Error applying fallback layout:', fallbackErr);
+        }
       }
     }
   }, []);
@@ -260,224 +313,123 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         level: newZoomLevel,
         renderedPosition: { x: cyRef.current.width() / 2, y: cyRef.current.height() / 2 }
       });
+      setZoomLevel(newZoomLevel);
     }
   }, []);
 
-  // Toggle do mini-mapa
-  const toggleMinimap = useCallback(() => {
-    setShowMinimap(!showMinimap);
-  }, [showMinimap]);
+  // Manipulador para quando o Cytoscape estiver pronto
+  const handleCytoscapeReady = (cy: cytoscape.Core) => {
+    try {
+      cyRef.current = cy;
+      
+      // Setup event handlers
+      cy.on('tap', 'node', handleNodeSelect);
+      cy.on('tap', 'edge', handleEdgeSelect);
+      
+      // Configurar tooltips
+      setupTooltips(cy);
+
+      cy.on('tap', (evt: any) => {
+        if (evt.target === cy) {
+          // Clicked on background
+          if (onNodeSelect) {
+            onNodeSelect(null);
+          }
+          if (onEdgeSelect) {
+            onEdgeSelect(null);
+          }
+        }
+      });
+
+      // Executar layout inicial
+      try {
+        cy.layout({
+          name: 'cola',
+          animate: true,
+          refresh: 1,
+          maxSimulationTime: 4000,
+          nodeSpacing: 50,
+          edgeLength: 200,
+          fit: true
+        } as any).run();
+      } catch (error) {
+        console.error('Error running layout:', error);
+        // Fallback para layout alternativo
+        cy.layout({ name: 'circle', animate: true } as any).run();
+      }
+
+      // Expor a instância do Cytoscape para o componente pai
+      if (onCytoscapeReady) {
+        onCytoscapeReady(cy);
+      }
+    } catch (error) {
+      console.error('Error setting up Cytoscape:', error);
+      setIsCytoscapeAvailable(false);
+    }
+  };
 
   // Se o Cytoscape não estiver disponível ou ocorrer um erro, use o componente alternativo
   if (!isCytoscapeAvailable || error) {
+    console.warn('Falling back to GraphAlternative component due to Cytoscape unavailability', error);
     return (
       <GraphAlternative 
         data={data}
         isLoading={isLoading}
-        onNodeSelect={(nodeId) => {
-          if (onNodeSelect && nodeId) {
-            const node = data.nodes.find(n => n.id === nodeId) || null;
-            onNodeSelect(node);
-          }
-        }}
-        onEdgeSelect={(edgeId) => {
-          if (onEdgeSelect && edgeId) {
-            const edge = data.edges.find(e => e.id === edgeId) || null;
-            onEdgeSelect(edge);
-          }
-        }}
+        onNodeSelect={onNodeSelect}
+        onEdgeSelect={onEdgeSelect}
       />
     );
   }
 
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex-1 px-4 py-1">
-          <input
-            type="range"
-            min="0.1"
-            max="3"
-            step="0.1"
-            value={zoomLevel}
-            onChange={handleZoomChange}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>10%</span>
-            <span>{Math.round(zoomLevel * 100)}%</span>
-            <span>300%</span>
-          </div>
-        </div>
-        <div className="flex space-x-2">
-          <button
-            className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
-            title="Zoom In"
-            onClick={zoomIn}
-          >
-            <ZoomInIcon className="h-5 w-5 text-gray-600" />
-          </button>
-          <button
-            className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
-            title="Zoom Out"
-            onClick={zoomOut}
-          >
-            <ZoomOutIcon className="h-5 w-5 text-gray-600" />
-          </button>
-          <button
-            className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
-            title="Fit View"
-            onClick={fitToScreen}
-          >
-            <ArrowsPointingOutIcon className="h-5 w-5 text-gray-600" />
-          </button>
-          <button
-            className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
-            title="Reset Layout"
-            onClick={resetLayout}
-          >
-            <ArrowPathIcon className="h-5 w-5 text-gray-600" />
-          </button>
-          <button
-            className={`p-2 rounded-full shadow ${showMinimap ? 'bg-blue-100 text-blue-600' : 'bg-white hover:bg-gray-100 text-gray-600'}`}
-            title="Show/Hide Minimap"
-            onClick={toggleMinimap}
-          >
-            <ViewfinderCircleIcon className="h-5 w-5" />
-          </button>
-        </div>
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-computing-purple"></div>
       </div>
+    );
+  }
 
-      <div 
-        ref={containerRef}
-        className="flex-1 border border-gray-300 rounded-lg overflow-hidden bg-white relative"
-        style={{ minHeight: "500px" }}
-      >
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full w-full">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        ) : cytoscapeData.nodes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full w-full bg-gray-100 rounded-lg">
-            <div className="text-center">
-              <p className="text-lg text-gray-600">No graph data available</p>
-              <p className="text-sm text-gray-500">Adjust your filters or load new data</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            <CytoscapeComponent
-              elements={[...cytoscapeData.nodes, ...cytoscapeData.edges]}
-              style={{ width: '100%', height: '100%' }}
-              stylesheet={getCytoscapeStylesheet()}
-              cy={(cy) => {
-                cyRef.current = cy;
-                
-                // Expor a instância do Cytoscape para o componente pai
-                if (onCytoscapeReady) {
-                  onCytoscapeReady(cy);
-                }
-                
-                // Adicionar tooltips
-                setupTooltips(cy);
-                
-                // Limpar todos os eventos anteriores
-                cy.removeAllListeners();
-                
-                // Adicionar eventos de seleção
-                cy.on('tap', 'node', handleNodeSelect);
-                cy.on('tap', 'edge', handleEdgeSelect);
-                
-                // Adicionar evento para desselecionar quando clicar no fundo
-                cy.on('tap', function(event) {
-                  if (event.target === cy) {
-                    if (onNodeSelect) onNodeSelect(null);
-                    if (onEdgeSelect) onEdgeSelect(null);
-                  }
-                });
-                
-                // Executar o layout inicial
-                try {
-                  const layout = cy.layout({
-                    name: 'cola',
-                    animate: true,
-                    refresh: 1,
-                    maxSimulationTime: 4000,
-                    nodeSpacing: 50,
-                    edgeLength: 200,
-                    randomize: true
-                  } as any);
-                  layout.run();
-                } catch (err) {
-                  console.error('Error running cola layout:', err);
-                  // Fallback para layout alternativo
-                  const fallbackLayout = cy.layout({
-                    name: 'circle', 
-                    animate: true
-                  } as any);
-                  fallbackLayout.run();
-                }
-              }}
-            />
-            
-            {/* Mini-mapa */}
-            {showMinimap && (
-              <div 
-                className="absolute bottom-4 right-4 w-48 h-48 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden opacity-80 hover:opacity-100 transition-opacity"
-                style={{ pointerEvents: 'none' }}
-              >
-                {cyRef.current && (
-                  <div className="w-full h-full">
-                    <CytoscapeComponent
-                      elements={[...cytoscapeData.nodes, ...cytoscapeData.edges]}
-                      style={{ width: '100%', height: '100%' }}
-                      stylesheet={[
-                        ...getCytoscapeStylesheet(),
-                        {
-                          selector: 'node',
-                          style: {
-                            width: 10,
-                            height: 10,
-                            label: '', // Sem labels no mini-mapa
-                          }
-                        },
-                        {
-                          selector: 'edge',
-                          style: {
-                            width: 1,
-                            label: '', // Sem labels no mini-mapa
-                          }
-                        }
-                      ]}
-                      cy={(miniCy) => {
-                        // Sincroniza o zoom e a posição com o grafo principal
-                        const syncViewport = () => {
-                          if (cyRef.current) {
-                            const mainPan = cyRef.current.pan();
-                            const mainZoom = cyRef.current.zoom();
-                            
-                            // Calcula a transformação inversa para mostrar a viewport
-                            miniCy.fit();
-                            miniCy.zoom(miniCy.zoom() * 0.8);
-                          }
-                        };
-                        
-                        // Aplica o layout
-                        miniCy.layout({
-                          name: 'preset',
-                          fit: true
-                        }).run();
-                        
-                        syncViewport();
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
+  if (!data || !data.nodes || data.nodes.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <p>No data available. Please adjust your filters or add new nodes.</p>
       </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full" ref={containerRef}>
+      <div className="absolute right-2 top-2 flex flex-col gap-2 z-10">
+        <button
+          onClick={handleZoomIn}
+          className="p-2 bg-white rounded-md shadow text-neutral-gray hover:bg-gray-100"
+          title="Zoom In"
+        >
+          <PlusIcon className="h-5 w-5" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="p-2 bg-white rounded-md shadow text-neutral-gray hover:bg-gray-100"
+          title="Zoom Out"
+        >
+          <MinusIcon className="h-5 w-5" />
+        </button>
+        <button
+          onClick={handleFit}
+          className="p-2 bg-white rounded-md shadow text-neutral-gray hover:bg-gray-100"
+          title="Fit to Screen"
+        >
+          <ArrowsPointingOutIcon className="h-5 w-5" />
+        </button>
+      </div>
+      
+      <CytoscapeComponent
+        elements={cytoscapeData.nodes.length > 0 ? [...cytoscapeData.nodes, ...cytoscapeData.edges] : []}
+        style={{ width: '100%', height: '100%' }}
+        stylesheet={getCytoscapeStylesheet()}
+        cy={(cy) => handleCytoscapeReady(cy)}
+        wheelSensitivity={0.2}
+      />
       
       {/* Estilo global para tooltips */}
       <style jsx global>{`

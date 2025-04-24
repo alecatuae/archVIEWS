@@ -51,12 +51,12 @@ export default function GraphNodes() {
       // Extract unique environments and types
       const envs = Array.from(new Set(response.data
         .map((node: Node) => node.properties.environment)
-        .filter(Boolean)));
+        .filter(Boolean))) as string[];
       setEnvironments(envs);
 
       const types = Array.from(new Set(response.data
         .map((node: Node) => node.properties.type)
-        .filter(Boolean)));
+        .filter(Boolean))) as string[];
       setNodeTypes(types);
     } catch (error: any) {
       console.error('Erro ao carregar nós:', error);
@@ -274,7 +274,7 @@ export default function GraphNodes() {
                     <div className="flex space-x-2">
                       <Link href={`/admin/graph-nodes/view/${node.id}`}>
                         <Button
-                          size="xs"
+                          size="sm"
                           variant="outline"
                           icon={<EyeIcon className="h-4 w-4" />}
                         >
@@ -283,7 +283,7 @@ export default function GraphNodes() {
                       </Link>
                       <Link href={`/admin/graph-nodes/edit/${node.id}`}>
                         <Button
-                          size="xs"
+                          size="sm"
                           variant="outline"
                           icon={<PencilSquareIcon className="h-4 w-4" />}
                         >
@@ -293,14 +293,14 @@ export default function GraphNodes() {
                       {confirmDelete === node.id ? (
                         <div className="flex space-x-1">
                           <Button
-                            size="xs"
+                            size="sm"
                             variant="danger"
                             onClick={() => handleDeleteNode(node.id)}
                           >
                             Confirmar
                           </Button>
                           <Button
-                            size="xs"
+                            size="sm"
                             variant="outline"
                             onClick={() => setConfirmDelete(null)}
                           >
@@ -309,8 +309,8 @@ export default function GraphNodes() {
                         </div>
                       ) : (
                         <Button
-                          size="xs"
-                          variant="danger-outline"
+                          size="sm"
+                          variant="danger"
                           icon={<TrashIcon className="h-4 w-4" />}
                           onClick={() => setConfirmDelete(node.id)}
                         >

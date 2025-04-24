@@ -1,302 +1,289 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraphData, Node, Edge } from '@/types/graph';
-import graphUtils from '@/utils/graphUtils';
+import { getRelationshipColor } from '@/utils/graphUtils';
 
 interface GraphAlternativeProps {
-  data: GraphData | null;
+  data: GraphData;
   isLoading?: boolean;
-  onNodeSelect?: (nodeId: string) => void;
-  onEdgeSelect?: (edgeId: string) => void;
-  className?: string;
+  onNodeSelect?: (node: Node | null) => void;
+  onEdgeSelect?: (edge: Edge | null) => void;
 }
 
 const GraphAlternative: React.FC<GraphAlternativeProps> = ({
   data,
   isLoading = false,
   onNodeSelect,
-  onEdgeSelect,
-  className
+  onEdgeSelect
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [viewBox, setViewBox] = useState("0 0 800 600");
-  const [positions, setPositions] = useState<Record<string, { x: number, y: number }>>({});
-  const [activeNode, setActiveNode] = useState<string | null>(null);
-  const [activeEdge, setActiveEdge] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'graph' | 'list'>('graph');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const [activeView, setActiveView] = useState<'graph' | 'list'>('graph');
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
-  // Calcula posições dos nós em um layout circular simples
+  // Resize handler
   useEffect(() => {
-    if (!data?.nodes?.length) return;
-    
-    const newPositions: Record<string, { x: number, y: number }> = {};
-    const centerX = dimensions.width / 2;
-    const centerY = dimensions.height / 2;
-    const radius = Math.min(dimensions.width, dimensions.height) * 0.35;
-    
-    data.nodes.forEach((node, index) => {
-      const angle = (index / data.nodes.length) * 2 * Math.PI;
-      newPositions[node.id] = {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle)
-      };
-    });
-    
-    setPositions(newPositions);
-  }, [data?.nodes, dimensions]);
-
-  // Ajusta o tamanho do SVG ao container
-  useEffect(() => {
-    if (!svgRef.current) return;
-    
-    const resizeObserver = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      setDimensions({ width, height });
-      setViewBox(`0 0 ${width} ${height}`);
-    });
-    
-    resizeObserver.observe(svgRef.current.parentElement as Element);
-    return () => {
-      resizeObserver.disconnect();
+    const updateSize = () => {
+      if (containerRef.current) {
+        const { width, height } = containerRef.current.getBoundingClientRect();
+        setContainerSize({ width, height });
+      }
     };
+
+    // Initial size
+    updateSize();
+
+    // Add resize event listener
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
   }, []);
 
+  // Calculate node positions in a circular layout
+  const calculateNodePositions = () => {
+    const nodes = data.nodes || [];
+    const nodeCount = nodes.length;
+    const centerX = containerSize.width / 2;
+    const centerY = containerSize.height / 2;
+    const radius = Math.min(centerX, centerY) * 0.8;
+
+    return nodes.map((node, index) => {
+      const angle = (2 * Math.PI * index) / nodeCount;
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      return { ...node, x, y };
+    });
+  };
+
+  // Handle node click
   const handleNodeClick = (node: Node) => {
-    setActiveNode(node.id);
-    setActiveEdge(null);
-    if (onNodeSelect) onNodeSelect(node.id);
+    setSelectedNode(selectedNode === node.id ? null : node.id);
+    if (onNodeSelect) {
+      onNodeSelect(node);
+    }
   };
 
+  // Handle edge click
   const handleEdgeClick = (edge: Edge) => {
-    setActiveEdge(edge.id);
-    setActiveNode(null);
-    if (onEdgeSelect) onEdgeSelect(edge.id);
+    if (onEdgeSelect) {
+      onEdgeSelect(edge);
+    }
   };
 
+  // Get node display name
+  const getNodeDisplayName = (node: Node) => {
+    return node.properties?.name || node.properties?.label || `ID: ${node.id.substring(0, 8)}`;
+  };
+
+  // Get edge display name
+  const getEdgeDisplayName = (edge: Edge) => {
+    return edge.type || 'Unknown';
+  };
+
+  // Render loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full w-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-computing-purple"></div>
       </div>
     );
   }
 
-  // Make sure data is properly initialized with empty arrays as fallback
-  const nodes = data?.nodes || [];
-  const edges = data?.edges || [];
-
-  if (nodes.length === 0) {
+  // Render empty state
+  if (!data || !data.nodes || data.nodes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full w-full bg-gray-100 rounded-lg border border-gray-300">
-        <div className="text-center">
-          <p className="text-lg text-gray-600">No graph data available</p>
-          <p className="text-sm text-gray-500">Adjust your filters or load new data</p>
-        </div>
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <p>No data available. Please adjust your filters or add new nodes.</p>
       </div>
     );
   }
+
+  // Calculate node positions
+  const nodesWithPositions = calculateNodePositions();
 
   return (
-    <div className={`flex flex-col h-full w-full ${className || ''}`}>
+    <div className="h-full flex flex-col" ref={containerRef}>
       <div className="flex justify-between items-center mb-4">
-        <div className="text-sm text-gray-500">
-          Showing {nodes.length} nodes and {edges.length} relationships
+        <div className="text-sm font-medium text-gray-500">
+          {data.nodes.length} nodes, {data.edges.length} relationships
         </div>
-        <div className="bg-gray-100 rounded-lg p-1 flex">
+        <div className="flex space-x-2">
           <button
-            className={`px-3 py-1 rounded-md text-sm ${viewMode === 'graph' ? 'bg-white shadow-sm' : ''}`}
-            onClick={() => setViewMode('graph')}
+            className={`px-3 py-1 text-sm rounded ${
+              activeView === 'graph'
+                ? 'bg-computing-purple text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            onClick={() => setActiveView('graph')}
           >
             Graph View
           </button>
           <button
-            className={`px-3 py-1 rounded-md text-sm ${viewMode === 'list' ? 'bg-white shadow-sm' : ''}`}
-            onClick={() => setViewMode('list')}
+            className={`px-3 py-1 text-sm rounded ${
+              activeView === 'list'
+                ? 'bg-computing-purple text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            onClick={() => setActiveView('list')}
           >
             List View
           </button>
         </div>
       </div>
-      
-      {viewMode === 'graph' ? (
-        <div className="flex-1 overflow-hidden border border-gray-200 rounded-lg bg-white">
-          <div className="h-full w-full relative">
-            <svg 
-              ref={svgRef}
-              viewBox={viewBox}
-              className="w-full h-full"
-              style={{ background: "#f8fafc" }}
-            >
-              {/* Desenha as arestas */}
-              {Object.keys(positions).length > 0 && edges.map(edge => {
-                if (!positions[edge.source] || !positions[edge.target]) return null;
-                
-                const source = positions[edge.source];
-                const target = positions[edge.target];
-                const edgeColor = graphUtils.getRelationshipColor(edge.type);
-                const isActive = activeEdge === edge.id;
-                
-                return (
-                  <g key={edge.id} onClick={() => handleEdgeClick(edge)}>
-                    <line
-                      x1={source.x}
-                      y1={source.y}
-                      x2={target.x}
-                      y2={target.y}
-                      stroke={edgeColor}
-                      strokeWidth={isActive ? 3 : 2}
-                      strokeOpacity={isActive ? 1 : 0.6}
-                    />
-                    {/* Seta direcional */}
-                    <polygon
-                      points="0,-3 6,0 0,3"
-                      fill={edgeColor}
-                      transform={`translate(${target.x}, ${target.y}) rotate(${Math.atan2(target.y - source.y, target.x - source.x) * 180 / Math.PI}) translate(-10, 0)`}
-                    />
-                    {/* Label da aresta - apenas se estiver ativa */}
-                    {isActive && (
-                      <g>
-                        {/* Background para o texto */}
-                        <rect
-                          x={(source.x + target.x) / 2 - 50}
-                          y={(source.y + target.y) / 2 - 20}
-                          width="100"
-                          height="20"
-                          fill="#ffffff"
-                          rx="4"
-                          opacity="0.8"
-                        />
-                        {/* Texto da aresta */}
-                        <text
-                          x={(source.x + target.x) / 2}
-                          y={(source.y + target.y) / 2 - 10}
-                          textAnchor="middle"
-                          fill="#4b5563"
-                          fontSize="12"
-                          fontWeight="500"
-                        >
-                          <tspan
-                            dy="-0.5em"
-                            x={(source.x + target.x) / 2}
-                            fill={edgeColor}
-                            fontWeight="bold"
-                          >
-                            {edge.type}
-                          </tspan>
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
+
+      {activeView === 'graph' ? (
+        <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-white">
+          <svg
+            ref={svgRef}
+            width={containerSize.width}
+            height={containerSize.height}
+            className="w-full h-full"
+          >
+            {/* Draw edges */}
+            {data.edges.map((edge) => {
+              const sourceNode = nodesWithPositions.find((n) => n.id === edge.source);
+              const targetNode = nodesWithPositions.find((n) => n.id === edge.target);
               
-              {/* Desenha os nós */}
-              {Object.keys(positions).length > 0 && nodes.map(node => {
-                if (!positions[node.id]) return null;
-                
-                const { x, y } = positions[node.id];
-                const isActive = activeNode === node.id;
-                const category = node.labels?.[0]?.toLowerCase() || 'default';
-                let fillColor = '#6b48ff'; // Default purple color
-                
-                if (category.includes('database')) fillColor = '#0897e9';
-                else if (category.includes('service')) fillColor = '#0adbe3';
-                else if (category.includes('component')) fillColor = '#feac0e';
-                else if (category.includes('infrastructure')) fillColor = '#363636';
-                
-                return (
-                  <g 
-                    key={node.id} 
-                    onClick={() => handleNodeClick(node)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={isActive ? 16 : 14}
-                      fill={fillColor}
-                      opacity={isActive ? 1 : 0.8}
-                      stroke={isActive ? '#fff' : 'transparent'}
-                      strokeWidth={2}
-                    />
-                    <text
-                      x={x}
-                      y={y + 30}
-                      textAnchor="middle"
-                      fill="#4b5563"
-                      fontSize={isActive ? 14 : 12}
-                      fontWeight={isActive ? "bold" : "normal"}
-                    >
-                      {graphUtils.getNodeDisplayLabel(node).length > 15 
-                        ? graphUtils.getNodeDisplayLabel(node).substring(0, 12) + '...'
-                        : graphUtils.getNodeDisplayLabel(node)}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-auto">
-          <h3 className="text-lg font-semibold mb-2">Nodes ({nodes.length})</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
-            {nodes.map((node) => {
-              // Garantir que node é válido e tem todas as propriedades necessárias
-              if (!node || !node.id) return null;
+              if (!sourceNode || !targetNode) return null;
               
-              const nodeProps = node.properties || {};
-              const isActive = activeNode === node.id;
+              const color = getRelationshipColor(edge.type);
+              const isSelected = selectedNode === edge.source || selectedNode === edge.target;
               
               return (
-                <div 
+                <g key={edge.id} onClick={() => handleEdgeClick(edge)} className="cursor-pointer">
+                  <line
+                    x1={sourceNode.x}
+                    y1={sourceNode.y}
+                    x2={targetNode.x}
+                    y2={targetNode.y}
+                    stroke={color}
+                    strokeWidth={isSelected ? 3 : 2}
+                    opacity={isSelected ? 1 : 0.7}
+                  />
+                  
+                  {/* Edge label */}
+                  <text
+                    x={(sourceNode.x + targetNode.x) / 2}
+                    y={(sourceNode.y + targetNode.y) / 2}
+                    textAnchor="middle"
+                    fill="#555"
+                    fontSize="10"
+                    dy="-5"
+                    className="pointer-events-none"
+                  >
+                    {edge.type}
+                  </text>
+                </g>
+              );
+            })}
+            
+            {/* Draw nodes */}
+            {nodesWithPositions.map((node) => {
+              const isSelected = selectedNode === node.id;
+              const category = node.properties?.category?.toLowerCase() || 'default';
+              let nodeColor = '#6B7280'; // Default gray
+              
+              // Assign colors based on category
+              if (category === 'server') nodeColor = '#3B82F6'; // Blue
+              if (category === 'firewall') nodeColor = '#EF4444'; // Red
+              if (category === 'storage') nodeColor = '#10B981'; // Green
+              if (category === 'internet') nodeColor = '#8B5CF6'; // Purple
+              
+              return (
+                <g
                   key={node.id}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    isActive 
-                      ? 'bg-blue-100 border-blue-400 shadow-sm' 
-                      : 'bg-blue-50 border-blue-200 hover:bg-blue-100'
+                  onClick={() => handleNodeClick(node)}
+                  className="cursor-pointer"
+                  transform={`translate(${node.x}, ${node.y})`}
+                >
+                  <circle
+                    r={isSelected ? 25 : 20}
+                    fill={nodeColor}
+                    opacity={isSelected ? 1 : 0.8}
+                    stroke={isSelected ? '#000' : '#fff'}
+                    strokeWidth={isSelected ? 2 : 1}
+                  />
+                  <text
+                    textAnchor="middle"
+                    fill="#fff"
+                    fontSize="10"
+                    dy="4"
+                    className="pointer-events-none"
+                  >
+                    {getNodeDisplayName(node)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+          <div className="p-4">
+            <h3 className="text-lg font-medium mb-2">Nodes</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {data.nodes.map((node) => (
+                <div
+                  key={node.id}
+                  className={`p-3 border rounded-md cursor-pointer ${
+                    selectedNode === node.id
+                      ? 'border-computing-purple bg-computing-purple/5'
+                      : 'border-gray-200 hover:bg-gray-50'
                   }`}
                   onClick={() => handleNodeClick(node)}
                 >
-                  <div className="font-medium truncate">{graphUtils.getNodeDisplayLabel(node)}</div>
-                  <div className="text-sm text-gray-600 flex justify-between">
-                    <span>{node.labels?.[0] || 'Unknown'}</span>
-                    <span className="text-gray-400">{node.id.substring(0, 8)}</span>
+                  <div className="font-medium">{getNodeDisplayName(node)}</div>
+                  <div className="text-xs text-gray-500">
+                    {node.properties?.category || 'Unknown Category'}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-          
-          <h3 className="text-lg font-semibold mb-2">Edges ({edges.length})</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {edges.map((edge) => {
-              // Garantir que edge é válido e tem todas as propriedades necessárias
-              if (!edge || !edge.id) return null;
-              
-              const isActive = activeEdge === edge.id;
-              const sourceNode = nodes.find(n => n.id === edge.source);
-              const targetNode = nodes.find(n => n.id === edge.target);
-              
-              return (
-                <div 
-                  key={edge.id}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                    isActive 
-                      ? 'bg-green-100 border-green-400 shadow-sm' 
-                      : 'bg-green-50 border-green-200 hover:bg-green-100'
-                  }`}
-                  onClick={() => handleEdgeClick(edge)}
-                >
-                  <div className="font-medium">{edge.type || 'Relationship'}</div>
-                  <div className="text-sm text-gray-600">
-                    <span className="truncate">{graphUtils.getNodeDisplayLabel(sourceNode || { id: edge.source })} </span>
-                    <span className="text-gray-400">→</span>
-                    <span className="truncate"> {graphUtils.getNodeDisplayLabel(targetNode || { id: edge.target })}</span>
-                  </div>
-                </div>
-              );
-            })}
+              ))}
+            </div>
+            
+            <h3 className="text-lg font-medium mt-6 mb-2">Relationships</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Relationship</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.edges.map((edge) => {
+                    const source = data.nodes.find((n) => n.id === edge.source);
+                    const target = data.nodes.find((n) => n.id === edge.target);
+                    
+                    return (
+                      <tr
+                        key={edge.id}
+                        className={`cursor-pointer hover:bg-gray-50 ${
+                          selectedNode === edge.source || selectedNode === edge.target
+                            ? 'bg-computing-purple/5'
+                            : ''
+                        }`}
+                        onClick={() => handleEdgeClick(edge)}
+                      >
+                        <td className="px-3 py-2 text-sm">
+                          {source ? getNodeDisplayName(source) : edge.source}
+                        </td>
+                        <td className="px-3 py-2 text-sm">
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                            style={{ backgroundColor: getRelationshipColor(edge.type) }}
+                          >
+                            {getEdgeDisplayName(edge)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-sm">
+                          {target ? getNodeDisplayName(target) : edge.target}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
