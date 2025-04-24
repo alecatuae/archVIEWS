@@ -111,12 +111,23 @@ const relationshipTypes = [
   { id: 'COMMUNICATES_WITH', label: 'Communicates With', color: '#0adbe3' }
 ];
 
+// Opções de layout disponíveis
+const layoutOptions = [
+  { name: 'cola', label: 'Force-Directed' },
+  { name: 'circle', label: 'Circle' },
+  { name: 'grid', label: 'Grid' },
+  { name: 'concentric', label: 'Concentric' },
+  { name: 'breadthfirst', label: 'Tree' }
+];
+
 export default function GraphTestPage() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [filteredData, setFilteredData] = useState<GraphData>(sampleData);
   const [cytoscapeInstance, setCytoscapeInstance] = useState<any>(null);
+  const [groupByCategory, setGroupByCategory] = useState<boolean>(false);
+  const [currentLayout, setCurrentLayout] = useState<string>('cola');
 
   // Função para limpar a seleção
   const clearSelection = () => {
@@ -211,17 +222,144 @@ export default function GraphTestPage() {
 
   const handleResetLayout = () => {
     if (cytoscapeInstance) {
-      const layout = cytoscapeInstance.layout({
-        name: 'cola',
-        animate: true,
-        refresh: 1,
-        maxSimulationTime: 4000,
-        nodeSpacing: 50,
-        edgeLength: 200,
-        randomize: true
-      });
-      layout.run();
+      applyLayout(currentLayout);
     }
+  };
+  
+  // Função para aplicar um layout específico
+  const applyLayout = (layoutName: string) => {
+    if (!cytoscapeInstance) return;
+    
+    try {
+      let layoutOptions: any = {
+        name: layoutName,
+        animate: true,
+        fit: true
+      };
+      
+      // Configurações específicas para cada tipo de layout
+      if (layoutName === 'cola') {
+        layoutOptions = {
+          ...layoutOptions,
+          refresh: 1,
+          maxSimulationTime: 4000,
+          nodeSpacing: 50,
+          edgeLength: 200,
+          randomize: true
+        };
+      } else if (layoutName === 'concentric') {
+        layoutOptions = {
+          ...layoutOptions,
+          concentric: (node: any) => node.degree(),
+          levelWidth: (nodes: any) => nodes.maxDegree() / 4,
+          spacingFactor: 1.5
+        };
+      } else if (layoutName === 'breadthfirst') {
+        layoutOptions = {
+          ...layoutOptions,
+          directed: true,
+          spacingFactor: 1.5
+        };
+      }
+      
+      const layout = cytoscapeInstance.layout(layoutOptions as any);
+      layout.run();
+    } catch (err) {
+      console.error(`Error applying ${layoutName} layout:`, err);
+      // Fallback para um layout simples
+      const fallbackLayout = cytoscapeInstance.layout({
+        name: 'circle',
+        animate: true
+      } as any);
+      fallbackLayout.run();
+    }
+  };
+
+  // Manipulador para troca de layout
+  const handleChangeLayout = (layoutName: string) => {
+    setCurrentLayout(layoutName);
+    applyLayout(layoutName);
+  };
+
+  // Manipulador para agrupamento por categoria
+  const handleGroupByCategory = (enabled: boolean) => {
+    setGroupByCategory(enabled);
+    
+    if (!cytoscapeInstance) return;
+    
+    if (enabled) {
+      // Agrupamento por categoria
+      // Primeiro, remover qualquer agrupamento anterior
+      cytoscapeInstance.nodes().forEach((node: any) => {
+        node.removeData('parent');
+      });
+      
+      // Remover grupos antigos
+      cytoscapeInstance.nodes().filter((node: any) => node.data('isGroup')).remove();
+      
+      // Criar um mapa de categorias
+      const categories = new Map<string, string[]>();
+      
+      // Agrupar nós por categoria
+      cytoscapeInstance.nodes().forEach((node: any) => {
+        const category = node.data('properties')?.category?.toLowerCase() || 'unknown';
+        if (!categories.has(category)) {
+          categories.set(category, []);
+        }
+        categories.get(category)?.push(node.id());
+      });
+      
+      // Criar nós de grupo para cada categoria
+      categories.forEach((nodeIds, category) => {
+        if (nodeIds.length > 1) {
+          // Criar um nó de grupo
+          const groupId = `group-${category}`;
+          cytoscapeInstance.add({
+            data: {
+              id: groupId,
+              label: category.charAt(0).toUpperCase() + category.slice(1),
+              isGroup: true
+            },
+            classes: 'group'
+          });
+          
+          // Adicionar nós ao grupo
+          nodeIds.forEach(nodeId => {
+            const node = cytoscapeInstance.getElementById(nodeId);
+            node.data('parent', groupId);
+          });
+        }
+      });
+      
+      // Aplicar estilo para grupos
+      cytoscapeInstance.style()
+        .selector('.group')
+        .style({
+          'shape': 'round-rectangle',
+          'padding': 20,
+          'background-opacity': 0.2,
+          'background-color': (ele: any) => {
+            const category = ele.data('label')?.toLowerCase();
+            if (category === 'application') return '#6b48ff';
+            if (category === 'database') return '#0897e9';
+            if (category === 'storage') return '#0897e9';
+            if (category === 'network') return '#0adbe3';
+            return '#888888';
+          }
+        })
+        .update();
+    } else {
+      // Remover agrupamento
+      cytoscapeInstance.nodes().forEach((node: any) => {
+        node.removeData('parent');
+      });
+      
+      // Remover nós de grupo
+      cytoscapeInstance.nodes().filter((node: any) => node.data('isGroup')).remove();
+    }
+    
+    // Reaplicar o layout atual
+    applyLayout(currentLayout);
   };
 
   // Função para receber a instância do Cytoscape da visualização
@@ -296,6 +434,9 @@ export default function GraphTestPage() {
             onRelationshipFilter={handleRelationshipFilter}
             onZoomToFit={handleZoomToFit}
             onResetLayout={handleResetLayout}
+            onGroupByCategory={handleGroupByCategory}
+            layoutOptions={layoutOptions}
+            onChangeLayout={handleChangeLayout}
           />
         </div>
         

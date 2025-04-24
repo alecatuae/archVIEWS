@@ -192,11 +192,13 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
                           />
                         </Link>
                         <Button
-                          size="xs"
-                          variant="danger"
-                          icon={<TrashIcon className="h-3 w-3" />}
                           onClick={() => handleDeleteRelationship(edge.id)}
-                        />
+                          variant="danger"
+                          size="sm"
+                          className="ml-2"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </li>
@@ -251,11 +253,13 @@ const NodeRelationships: React.FC<NodeRelationshipsProps> = ({
                           />
                         </Link>
                         <Button
-                          size="xs"
-                          variant="danger"
-                          icon={<TrashIcon className="h-3 w-3" />}
                           onClick={() => handleDeleteRelationship(edge.id)}
-                        />
+                          variant="danger"
+                          size="sm"
+                          className="ml-2"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </li>

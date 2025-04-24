@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FunnelIcon, AdjustmentsHorizontalIcon, ArrowsPointingOutIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { FunnelIcon, AdjustmentsHorizontalIcon, ArrowsPointingOutIcon, ArrowPathIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 
 interface CategoryFilterOption {
   id: string;
@@ -20,6 +20,12 @@ interface GraphControlsProps {
   onRelationshipFilter: (selectedRelationships: string[]) => void;
   onZoomToFit: () => void;
   onResetLayout: () => void;
+  onGroupByCategory?: (enabled: boolean) => void;
+  layoutOptions?: {
+    name: string;
+    label: string;
+  }[];
+  onChangeLayout?: (layoutName: string) => void;
 }
 
 const GraphControls: React.FC<GraphControlsProps> = ({
@@ -28,14 +34,31 @@ const GraphControls: React.FC<GraphControlsProps> = ({
   onNodeCategoryFilter,
   onRelationshipFilter,
   onZoomToFit,
-  onResetLayout
+  onResetLayout,
+  onGroupByCategory,
+  layoutOptions = [
+    { name: 'cola', label: 'Force-Directed' },
+    { name: 'circle', label: 'Circle' },
+    { name: 'grid', label: 'Grid' },
+    { name: 'concentric', label: 'Concentric' }
+  ],
+  onChangeLayout
 }) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const [selectedNodeCategories, setSelectedNodeCategories] = useState<string[]>([]);
   const [selectedRelationships, setSelectedRelationships] = useState<string[]>([]);
+  const [groupByCategory, setGroupByCategory] = useState(false);
+  const [currentLayout, setCurrentLayout] = useState('cola');
 
   const toggleFilter = () => {
     setIsFilterOpen(!isFilterOpen);
+    if (isLayoutOpen) setIsLayoutOpen(false);
+  };
+
+  const toggleLayout = () => {
+    setIsLayoutOpen(!isLayoutOpen);
+    if (isFilterOpen) setIsFilterOpen(false);
   };
 
   const handleCategoryChange = (categoryId: string) => {
@@ -78,6 +101,22 @@ const GraphControls: React.FC<GraphControlsProps> = ({
     onRelationshipFilter([]);
   };
 
+  const toggleGroupByCategory = () => {
+    const newValue = !groupByCategory;
+    setGroupByCategory(newValue);
+    if (onGroupByCategory) {
+      onGroupByCategory(newValue);
+    }
+  };
+
+  const handleLayoutChange = (layoutName: string) => {
+    setCurrentLayout(layoutName);
+    if (onChangeLayout) {
+      onChangeLayout(layoutName);
+    }
+    setIsLayoutOpen(false);
+  };
+
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-3">
@@ -90,6 +129,16 @@ const GraphControls: React.FC<GraphControlsProps> = ({
           >
             <FunnelIcon className="h-4 w-4 mr-1" />
             <span className="text-sm font-medium">Filters</span>
+          </button>
+          
+          <button
+            onClick={toggleLayout}
+            className={`px-3 py-2 rounded-md flex items-center ${
+              isLayoutOpen ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+            }`}
+          >
+            <Squares2X2Icon className="h-4 w-4 mr-1" />
+            <span className="text-sm font-medium">Layout</span>
           </button>
           
           <button
@@ -111,7 +160,22 @@ const GraphControls: React.FC<GraphControlsProps> = ({
           </button>
         </div>
         
-        <div>
+        <div className="flex items-center">
+          {onGroupByCategory && (
+            <div className="mr-3">
+              <label className="inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer"
+                  checked={groupByCategory}
+                  onChange={toggleGroupByCategory}
+                />
+                <div className="relative w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                <span className="ml-2 text-xs text-gray-700">Group by Category</span>
+              </label>
+            </div>
+          )}
+          
           <span className="text-xs text-gray-500">
             {`${nodeCategories.length} types · ${relationshipTypes.length} relationships`}
           </span>
@@ -212,6 +276,27 @@ const GraphControls: React.FC<GraphControlsProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+      
+      {isLayoutOpen && onChangeLayout && (
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4 border border-gray-200">
+          <h3 className="font-medium text-sm mb-3">Layout Options</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {layoutOptions.map((option) => (
+              <button
+                key={option.name}
+                onClick={() => handleLayoutChange(option.name)}
+                className={`p-2 rounded text-sm ${
+                  currentLayout === option.name
+                    ? 'bg-blue-100 text-blue-600 border border-blue-200'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         </div>
       )}
