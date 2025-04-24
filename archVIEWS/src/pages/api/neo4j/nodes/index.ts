@@ -1,99 +1,147 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import neo4jService from '@/services/neo4jService';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { neo4jService } from '@/services/neo4jService';
+
+interface CreateNodeData {
+  labels: string[];
+  properties: Record<string, any>;
+  environment?: string;
+}
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  switch (req.method) {
-    case 'GET':
-      return getNodes(req, res);
-    case 'POST':
-      return createNode(req, res);
-    default:
-      return res.status(405).json({ error: 'Method not allowed' });
-  }
-}
-
-async function getNodes(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    const { limit = '100', environment = 'all', label = 'Component' } = req.query;
-    
-    // Construir a consulta Cypher
-    let query = `MATCH (n${label !== 'all' ? ':' + label : ''})`;
-    
-    // Adicionar filtro de ambiente se necessário
-    if (environment !== 'all') {
-      query += ` WHERE n.environment = $environment`;
-    }
-    
-    // Finalizar a consulta
-    query += ` RETURN n LIMIT $limit`;
-    
-    const result = await neo4jService.executeQuery(query, {
-      limit: parseInt(limit.toString()),
-      environment
-    });
-    
-    if (!result.success) {
-      throw new Error(result.message || 'Erro ao buscar nós');
-    }
-    
-    // Processar os resultados para o formato esperado
-    const nodes = result.results.map(record => {
-      const nodeData = record.n;
+  // GET - listar nós com paginação e filtros
+  if (req.method === 'GET') {
+    try {
+      // Parâmetros de paginação e filtros
+      const limit = parseInt(req.query.limit as string, 10) || 10;
+      const offset = parseInt(req.query.offset as string, 10) || 0;
+      const labels = req.query.labels as string;
+      const environment = req.query.environment as string;
+      const search = req.query.search as string;
       
-      return {
-        id: nodeData.identity.toString(),
-        labels: nodeData.labels,
-        properties: nodeData.properties
-      };
-    });
-    
-    return res.status(200).json(nodes);
-  } catch (error: any) {
-    console.error('Erro ao buscar nós:', error);
-    return res.status(500).json({ error: error.message || 'Erro ao buscar nós' });
-  }
-}
+      if (limit > 100) {
+        return res.status(400).json({ error: 'O limite máximo é 100' });
+      }
 
-async function createNode(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    const { labels = ['Component'], properties } = req.body;
-    
-    if (!properties || !properties.name) {
-      return res.status(400).json({ error: 'Propriedades inválidas. Nome é obrigatório.' });
+      // Construir a query com base nos filtros
+      let query = 'MATCH (n)';
+      const params: Record<string, any> = { limit, offset };
+      
+      // Filtrar por labels (se especificado)
+      if (labels) {
+        const labelsList = labels.split(',');
+        if (labelsList.length > 0) {
+          query += ` WHERE n:${labelsList.map((_, i) => `$label${i}`).join(' OR n:')}`;
+          labelsList.forEach((label, i) => {
+            params[`label${i}`] = label.trim();
+          });
+        }
+      }
+      
+      // Adicionar filtro de ambiente
+      if (environment) {
+        query += labels ? ' AND' : ' WHERE';
+        query += ' n.environment = $environment';
+        params.environment = environment;
+      }
+      
+      // Adicionar busca por propriedades
+      if (search) {
+        const searchCondition = labels || environment ? ' AND' : ' WHERE';
+        query += `${searchCondition} (`;
+        
+        // Buscar em todas as propriedades de texto usando regex
+        const searchProperties = ['name', 'description', 'title', 'id'];
+        const searchConditions = searchProperties.map(prop => 
+          `n.${prop} =~ $searchRegex`
+        );
+        
+        query += searchConditions.join(' OR ');
+        query += ')';
+        params.searchRegex = `(?i).*${search}.*`;
+      }
+      
+      // Adicionar contagem total
+      const countQuery = `${query} RETURN count(n) as total`;
+      const countResult = await neo4jService.executeQuery(countQuery, params);
+      const total = countResult.records[0].get('total').toNumber();
+      
+      // Adicionar paginação e retornar resultados
+      query += ' RETURN n ORDER BY n.name SKIP $offset LIMIT $limit';
+      
+      const result = await neo4jService.executeQuery(query, params);
+      
+      const nodes = result.records.map(record => {
+        const node = record.get('n');
+        return {
+          id: node.identity.toString(),
+          labels: node.labels,
+          properties: node.properties
+        };
+      });
+      
+      return res.status(200).json({
+        nodes,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total
+        }
+      });
+    } catch (error: any) {
+      console.error('Erro ao listar nós:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao listar nós' });
     }
-    
-    // Criar o nó no Neo4j
-    const labelString = labels.join(':');
-    const query = `
-      CREATE (n:${labelString} $properties)
-      RETURN n
-    `;
-    
-    const result = await neo4jService.executeQuery(query, { properties });
-    
-    if (!result.success) {
-      throw new Error(result.message || 'Erro ao criar nó');
-    }
-    
-    // Obter o nó criado da resposta
-    const nodeData = result.results[0]?.n;
-    
-    if (!nodeData) {
-      throw new Error('Nó criado mas não foi possível obter os dados');
-    }
-    
-    const createdNode = {
-      id: nodeData.identity.toString(),
-      labels: nodeData.labels,
-      properties: nodeData.properties
-    };
-    
-    return res.status(201).json(createdNode);
-  } catch (error: any) {
-    console.error('Erro ao criar nó:', error);
-    return res.status(500).json({ error: error.message || 'Erro ao criar nó' });
   }
+  
+  // POST - criar um novo nó
+  if (req.method === 'POST') {
+    try {
+      const { labels, properties, environment }: CreateNodeData = req.body;
+      
+      // Validar os dados de entrada
+      if (!labels || !Array.isArray(labels) || labels.length === 0) {
+        return res.status(400).json({ error: 'É necessário fornecer pelo menos um label' });
+      }
+      
+      if (!properties || typeof properties !== 'object') {
+        return res.status(400).json({ error: 'Propriedades inválidas' });
+      }
+      
+      // Adicionar o ambiente às propriedades se especificado
+      if (environment) {
+        properties.environment = environment;
+      }
+      
+      // Construir a query para criar o nó
+      const labelString = labels.map(label => `:${label}`).join('');
+      const query = `
+        CREATE (n${labelString} $properties)
+        RETURN n
+      `;
+      
+      const result = await neo4jService.executeQuery(query, { properties });
+      
+      if (result.records.length === 0) {
+        return res.status(500).json({ error: 'Falha ao criar o nó' });
+      }
+      
+      const node = result.records[0].get('n');
+      
+      return res.status(201).json({
+        id: node.identity.toString(),
+        labels: node.labels,
+        properties: node.properties
+      });
+    } catch (error: any) {
+      console.error('Erro ao criar nó:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao criar nó' });
+    }
+  }
+  
+  // Método não permitido
+  return res.status(405).json({ error: 'Método não permitido' });
 } 
