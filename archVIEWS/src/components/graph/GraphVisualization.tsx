@@ -3,20 +3,6 @@ import { GraphData, CytoscapeGraphData, Node, Edge } from '@/types/graph';
 import { transformToCytoscapeFormat, getCytoscapeStylesheet } from '@/utils/graphUtils';
 import { ZoomInIcon, ZoomOutIcon, ArrowsPointingOutIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import GraphAlternative from './GraphAlternative';
-import dynamic from 'next/dynamic';
-
-// Import the CytoscapeWrapper with dynamic import to prevent SSR issues
-const CytoscapeWrapper = dynamic(
-  () => import('./CytoscapeWrapper.tsx').then(mod => mod),
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    )
-  }
-);
 
 interface GraphVisualizationProps {
   data: GraphData;
@@ -36,7 +22,6 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [cytoscapeData, setCytoscapeData] = useState<CytoscapeGraphData>({ nodes: [], edges: [] });
   const [selectedElement, setSelectedElement] = useState<any>(null);
-  const [showAlternativeView, setShowAlternativeView] = useState<boolean>(true);
 
   useEffect(() => {
     if (data && data.nodes && data.edges) {
@@ -44,17 +29,6 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
       setCytoscapeData(transformed);
     }
   }, [data]);
-
-  // Handle node selection in cytoscape
-  const handleNodeSelect = (event: any) => {
-    if (event.target && event.target.isNode && event.target.isNode()) {
-      const nodeId = event.target.id();
-      const node = data.nodes.find(n => n.id === nodeId);
-      if (node && onNodeSelect) {
-        onNodeSelect(node);
-      }
-    }
-  };
   
   return (
     <div className="flex flex-col h-full">
@@ -94,7 +68,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         className="flex-1 border border-gray-300 rounded-lg overflow-hidden bg-white"
         style={{ minHeight: "500px" }}
       >
-        {/* Always use the GraphAlternative component for now until we resolve the Cytoscape issues */}
+        {/* Use the GraphAlternative component as a fallback */}
         <GraphAlternative 
           data={data}
           isLoading={isLoading}
