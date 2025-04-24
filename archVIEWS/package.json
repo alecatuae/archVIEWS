@@ -17,6 +17,7 @@
     "axios": "^1.4.0",
     "cytoscape": "^3.25.0",
     "cytoscape-cola": "^2.5.1",
+    "cytoscape-popper": "^4.0.1",
     "neo4j-driver": "^5.28.1",
     "next": "13.4.7",
     "postcss": "8.4.24",

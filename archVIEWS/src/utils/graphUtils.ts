@@ -257,11 +257,122 @@ function processNeo4jRelationship(relData: any, sourceNode: any, targetNode: any
   }
 }
 
+// Função para formatar texto de label (transformar de SNAKE_CASE para Texto Legível)
+export function formatLabelText(text: string): string {
+  if (!text) return '';
+  
+  // Substitui underscores por espaços e capitaliza cada palavra
+  return text
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+    .trim();
+}
+
+// Get a formatted display label for a node
+export function getNodeDisplayLabel(node: any): string {
+  if (!node) return '';
+  
+  // Try to get name from properties
+  if (node.properties?.name) {
+    return node.properties.name;
+  }
+  
+  // Try to get label from labels array
+  if (node.labels && node.labels.length > 0) {
+    // Format the label to be more readable (remove underscores, capitalize words)
+    return formatLabelText(node.labels[0]);
+  }
+  
+  // If node has a type property
+  if (node.type) {
+    return formatLabelText(node.type);
+  }
+  
+  // Fallback to id
+  return node.id ? `Node ${node.id.substring(0, 8)}...` : 'Unknown Node';
+}
+
+/**
+ * Formata o valor de uma propriedade para exibição na interface
+ * @param value Valor da propriedade
+ * @returns Valor formatado como string
+ */
+export function formatPropertyValue(value: any): string {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  
+  if (typeof value === 'boolean') {
+    return value ? 'Sim' : 'Não';
+  }
+  
+  if (typeof value === 'object') {
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : '-';
+    }
+    try {
+      return JSON.stringify(value);
+    } catch (e) {
+      return '[Objeto complexo]';
+    }
+  }
+  
+  return String(value);
+}
+
+/**
+ * Ordena as propriedades de um objeto para exibição na interface
+ * @param properties Objeto de propriedades
+ * @returns Array de tuplas [chave, valor] ordenadas
+ */
+export function getSortedProperties(properties: Record<string, any> | null | undefined): [string, any][] {
+  if (!properties) return [];
+  
+  // Propriedades prioritárias que sempre devem aparecer primeiro (se existirem)
+  const priorityProps = ['name', 'type', 'category', 'description', 'status', 'environment'];
+  
+  // Filtrar propriedades que não devem ser exibidas
+  const excludeProps = ['id', 'labels', 'identity', 'elementId'];
+  const filteredEntries = Object.entries(properties).filter(
+    ([key]) => !excludeProps.includes(key)
+  );
+  
+  // Separar as propriedades prioritárias
+  const priorityEntries: [string, any][] = [];
+  const regularEntries: [string, any][] = [];
+  
+  filteredEntries.forEach(entry => {
+    if (priorityProps.includes(entry[0])) {
+      priorityEntries.push(entry);
+    } else {
+      regularEntries.push(entry);
+    }
+  });
+  
+  // Ordenar as propriedades prioritárias na ordem definida
+  priorityEntries.sort((a, b) => {
+    return priorityProps.indexOf(a[0]) - priorityProps.indexOf(b[0]);
+  });
+  
+  // Ordenar as propriedades regulares em ordem alfabética
+  regularEntries.sort((a, b) => a[0].localeCompare(b[0]));
+  
+  // Juntar os arrays e retornar
+  return [...priorityEntries, ...regularEntries];
+}
+
 export default {
   transformToCytoscapeFormat,
   getRelationshipColor,
   formatNodeLabel,
   formatEdgeLabel,
   getCytoscapeStylesheet,
-  processNeo4jResponse
+  processNeo4jResponse,
+  getNodeDisplayLabel,
+  formatLabelText,
+  formatPropertyValue,
+  getSortedProperties
 }; 
