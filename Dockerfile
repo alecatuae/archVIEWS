@@ -2,6 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install development tools needed for node-gyp
+RUN apk add --no-cache python3 make g++
+
 # Copy application files from the archVIEWS directory
 COPY archVIEWS/package*.json ./
 RUN npm install

@@ -63,6 +63,7 @@ services:
       - DATABASE_URL=mysql://archview_user:password@mariadb:3306/archview
       - PORT=3000
       - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
     volumes:
       - ./archVIEWS:/app
       - /app/node_modules
