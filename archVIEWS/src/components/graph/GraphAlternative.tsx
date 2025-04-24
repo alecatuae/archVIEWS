@@ -30,7 +30,11 @@ const GraphAlternative: React.FC<GraphAlternativeProps> = ({
     );
   }
 
-  if (!data.nodes || data.nodes.length === 0) {
+  // Make sure data is properly initialized with empty arrays as fallback
+  const nodes = data?.nodes || [];
+  const edges = data?.edges || [];
+
+  if (nodes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full bg-gray-100 rounded-lg border border-gray-300">
         <div className="text-center">
@@ -51,42 +55,56 @@ const GraphAlternative: React.FC<GraphAlternativeProps> = ({
       </div>
       
       <div className="flex-1 overflow-auto">
-        <h3 className="text-lg font-semibold mb-2">Nodes ({data.nodes.length})</h3>
+        <h3 className="text-lg font-semibold mb-2">Nodes ({nodes.length})</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
-          {data.nodes.slice(0, 9).map((node) => (
-            <div 
-              key={node.id}
-              className="p-3 bg-blue-50 rounded-lg border border-blue-200 cursor-pointer hover:bg-blue-100"
-              onClick={() => handleNodeClick(node)}
-            >
-              <div className="font-medium">{node.name || node.id}</div>
-              <div className="text-sm text-gray-600">{node.category} · {node.type}</div>
-            </div>
-          ))}
-          {data.nodes.length > 9 && (
+          {nodes.slice(0, 9).map((node) => {
+            // Garantir que node é válido e tem todas as propriedades necessárias
+            if (!node || !node.id) return null;
+            
+            const nodeProps = node.properties || {};
+            
+            return (
+              <div 
+                key={node.id}
+                className="p-3 bg-blue-50 rounded-lg border border-blue-200 cursor-pointer hover:bg-blue-100"
+                onClick={() => handleNodeClick(node)}
+              >
+                <div className="font-medium">{nodeProps.name || node.id}</div>
+                <div className="text-sm text-gray-600">
+                  {nodeProps.category || 'Unknown'} · {nodeProps.type || 'Unknown'}
+                </div>
+              </div>
+            );
+          })}
+          {nodes.length > 9 && (
             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
-              + {data.nodes.length - 9} more nodes
+              + {nodes.length - 9} more nodes
             </div>
           )}
         </div>
         
-        <h3 className="text-lg font-semibold mb-2">Edges ({data.edges.length})</h3>
+        <h3 className="text-lg font-semibold mb-2">Edges ({edges.length})</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {data.edges.slice(0, 9).map((edge) => (
-            <div 
-              key={edge.id}
-              className="p-3 bg-green-50 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100"
-              onClick={() => handleEdgeClick(edge)}
-            >
-              <div className="font-medium">{edge.type || 'Relationship'}</div>
-              <div className="text-sm text-gray-600">
-                {edge.source} → {edge.target}
+          {edges.slice(0, 9).map((edge) => {
+            // Garantir que edge é válido e tem todas as propriedades necessárias
+            if (!edge || !edge.id) return null;
+            
+            return (
+              <div 
+                key={edge.id}
+                className="p-3 bg-green-50 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100"
+                onClick={() => handleEdgeClick(edge)}
+              >
+                <div className="font-medium">{edge.type || 'Relationship'}</div>
+                <div className="text-sm text-gray-600">
+                  {edge.source} → {edge.target}
+                </div>
               </div>
-            </div>
-          ))}
-          {data.edges.length > 9 && (
+            );
+          })}
+          {edges.length > 9 && (
             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
-              + {data.edges.length - 9} more edges
+              + {edges.length - 9} more edges
             </div>
           )}
         </div>

@@ -15,12 +15,18 @@ interface UseGraphDataResult {
   fetchData: (params?: { limit?: number; environment?: string }) => Promise<void>;
 }
 
+// Default empty graph data
+const emptyGraphData: GraphData = {
+  nodes: [],
+  edges: []
+};
+
 export default function useGraphData({
   limit = 100,
   environment = 'all',
   initialLoad = true
 }: UseGraphDataProps = {}): UseGraphDataResult {
-  const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
+  const [data, setData] = useState<GraphData>(emptyGraphData);
   const [isLoading, setIsLoading] = useState<boolean>(initialLoad);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,10 +41,18 @@ export default function useGraphData({
 
       const response = await axios.get<GraphData>(`/api/neo4j/graph?${queryParams.toString()}`);
       
-      setData(response.data);
+      // Ensure we have a valid GraphData structure
+      const responseData: GraphData = {
+        nodes: response.data?.nodes || [],
+        edges: response.data?.edges || []
+      };
+      
+      setData(responseData);
     } catch (err: any) {
       console.error('Error fetching graph data:', err);
       setError(err.response?.data?.error || err.message || 'Failed to fetch graph data');
+      // Reset to empty data on error
+      setData(emptyGraphData);
     } finally {
       setIsLoading(false);
     }

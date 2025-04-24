@@ -4,7 +4,7 @@ import GraphVisualization from '@/components/graph/GraphVisualization';
 import GraphSidebar from '@/components/graph/GraphSidebar';
 import RelationshipTable from '@/components/graph/RelationshipTable';
 import useGraphData from '@/hooks/useGraphData';
-import { Node, Edge } from '@/types/graph';
+import { Node, Edge, GraphData } from '@/types/graph';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
@@ -17,6 +17,12 @@ export default function Home() {
     limit: 100,
     initialLoad: true
   });
+  
+  // Ensure data is properly initialized
+  const safeData: GraphData = {
+    nodes: data?.nodes || [],
+    edges: data?.edges || []
+  };
   
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
@@ -68,7 +74,7 @@ export default function Home() {
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
           <div className="lg:w-8/12">
             <GraphVisualization 
-              data={data}
+              data={safeData}
               isLoading={isLoading}
               onNodeSelect={handleNodeSelect}
               onEdgeSelect={handleEdgeSelect}
@@ -79,8 +85,8 @@ export default function Home() {
               selectedNode={selectedNode}
               selectedEdge={selectedEdge}
               graphStats={{
-                nodeCount: data.nodes.length,
-                edgeCount: data.edges.length
+                nodeCount: safeData.nodes.length,
+                edgeCount: safeData.edges.length
               }}
               onClose={clearSelection}
             />
@@ -90,8 +96,8 @@ export default function Home() {
         <div className="mt-8">
           <h2 className="text-xl font-bold text-neutral-gray mb-4">Tabela de Relacionamentos</h2>
           <RelationshipTable 
-            edges={data.edges} 
-            nodes={data.nodes}
+            edges={safeData.edges} 
+            nodes={safeData.nodes}
             onEdgeSelect={handleEdgeSelect}
             onNodeSelect={handleNodeSelect}
           />

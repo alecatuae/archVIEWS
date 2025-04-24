@@ -2,6 +2,7 @@ import React from 'react';
 import { Node, Edge } from '@/types/graph';
 import { getCategoryIcon } from '@/utils/categoryIcons';
 import { formatNodeLabel, formatEdgeLabel, getRelationshipColor } from '@/utils/graphUtils';
+import { ServerIcon } from '@heroicons/react/24/outline';
 
 interface GraphSidebarProps {
   selectedNode: Node | null;
@@ -23,7 +24,8 @@ const GraphSidebar: React.FC<GraphSidebarProps> = ({
 
   const renderNodeDetails = (node: Node) => {
     const { properties, labels } = node;
-    const CategoryIcon = getCategoryIcon(properties.category);
+    const categoryStr = properties?.category as string | undefined;
+    const CategoryIcon = getCategoryIcon(categoryStr) || ServerIcon;
 
     return (
       <div>
@@ -32,14 +34,14 @@ const GraphSidebar: React.FC<GraphSidebarProps> = ({
             <CategoryIcon className="h-6 w-6" />
           </div>
           <h3 className="text-xl font-semibold">
-            {properties.name || 'Componente sem nome'}
+            {properties?.name || 'Componente sem nome'}
           </h3>
         </div>
 
         <div className="mb-4">
           <h4 className="font-medium text-neutral-gray mb-2">Tipo</h4>
           <div className="flex flex-wrap gap-2">
-            {labels.map((label) => (
+            {labels && labels.map((label) => (
               <span
                 key={label}
                 className="px-2 py-1 bg-bg-gray rounded-full text-sm"
@@ -54,7 +56,7 @@ const GraphSidebar: React.FC<GraphSidebarProps> = ({
           <h4 className="font-medium text-neutral-gray mb-2">Propriedades</h4>
           <table className="w-full">
             <tbody>
-              {Object.entries(properties)
+              {properties && Object.entries(properties)
                 .filter(([key]) => key !== 'name') // Nome já foi exibido no título
                 .map(([key, value]) => (
                   <tr key={key} className="border-b border-gray-200">
@@ -98,7 +100,7 @@ const GraphSidebar: React.FC<GraphSidebarProps> = ({
           <h4 className="font-medium text-neutral-gray mb-2">Propriedades</h4>
           <table className="w-full">
             <tbody>
-              {Object.entries(properties).map(([key, value]) => (
+              {properties && Object.entries(properties).map(([key, value]) => (
                 <tr key={key} className="border-b border-gray-200">
                   <td className="py-2 font-medium">{key}</td>
                   <td className="py-2 text-right">

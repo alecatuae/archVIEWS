@@ -50,7 +50,16 @@ export const categoryIcons: CategoryIconMapping = {
   'Default': ServerIcon
 };
 
-export function getCategoryIcon(category: string = 'Default') {
+/**
+ * Retorna o ícone correspondente à categoria ou ServerIcon como fallback.
+ * @param category Nome da categoria para obter o ícone
+ * @returns Um componente de ícone válido
+ */
+export function getCategoryIcon(category?: string): typeof ServerIcon {
+  if (!category) {
+    return categoryIcons.Default;
+  }
+  
   return categoryIcons[category] || categoryIcons.Default;
 }
 
